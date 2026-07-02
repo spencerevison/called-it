@@ -12,7 +12,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 ## P1 · Data model (per DATA_MODEL.md — normative)
 
 - [x] T05: Migration: all enums + `profiles`. — AC: migration applies cleanly to a fresh local db.
-- [ ] T06: Migration: `decisions`, `decision_events` + indexes. — AC: constraints from DATA_MODEL enforced (checked via a throwaway insert test).
+- [x] T06: Migration: `decisions`, `decision_events` + indexes. — AC: constraints from DATA_MODEL enforced (checked via a throwaway insert test).
 - [ ] T07: Migration: `forecasts` + probability check constraint + indexes. — AC: p=0.005 insert rejected.
 - [ ] T08: Migration: `premortems`, `premortem_risks` + indexes. — AC: cascade delete verified.
 - [ ] T09: Migration: `checkins` (incl. `overall_attribution`), `checkin_failures` + indexes. — AC: `linked_risk_id` FK nullable and enforced.
