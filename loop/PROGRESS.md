@@ -18,3 +18,4 @@ Appended by the loop, one line per iteration. Humans read bottom-up.
 2026-07-02T06:30:01Z | T12 | gates: pass | 27d7d4e | scripts/seed.ts (tsx devDep) -- 4 committed decisions/1 reversal, 12 forecasts/7 resolved/4 desired/2 recalled, 2 completed checkins, 5 failures (4 knowable/2 linked); header hand-values verified against local db counts, db:seed idempotent
 2026-07-02T06:36:34Z | T13 | gates: pass | 878ae9b | metrics lib: M1/M2/M10 HAND stubs quarantined to *.hand.test.ts (pnpm test:hand); M3-M9 implemented directly to keep pnpm check green (see QUESTIONS.md)
 2026-07-02T06:37:30Z | T16 | gates: pass | f314285 | M3 hindsight + M4 optimism already implemented + green from T13's pass; no code change needed, checked off
+2026-07-02T06:38:41Z | T17 | gates: pass | 2a8f6b0 | M5/M6/M7 already implemented + green from T13's pass; no code change needed, checked off
