@@ -4,3 +4,4 @@ Format: `<ISO timestamp> | T## | gates: pass|fail → blocked | <short-sha> | <o
 Appended by the loop, one line per iteration. Humans read bottom-up.
 
 ---
+2026-07-02T05:15:41Z | T01 | gates: pass | ee05d05 | Next.js 16.2.9, React 19.2.4, Tailwind v4.3.2, shadcn base-nova style, vitest 4.1.9, pnpm 11.9.0; full DESIGN.md semantic token set wired in globals.css @theme
