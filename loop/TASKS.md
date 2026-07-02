@@ -25,7 +25,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 - [x] T13: Transcribe **all** METRICS.md test vectors (M1–M10, including empty-input cases) into `src/lib/metrics/*.test.ts`, verbatim expected values; create typed function signatures for all ten metrics; stub `[HAND]` implementations (M1, M2, M10) with `throw new Error("HAND: not yet implemented")` ; their specs live in `*.hand.test.ts` files excluded from the default vitest config and run by a second config via `pnpm test:hand` (this file-split is the sanctioned mechanism — not a skipped test, no gate-rule violation). — AC: `pnpm check` green; `pnpm test:hand` runs exactly the HAND specs and fails.
 - [ ] T14 [HAND]: Implement M1 Brier + rolling Brier. — AC: `pnpm test:hand` M1 specs green.
 - [ ] T15 [HAND]: Implement M2 calibration-curve binning. — AC: M2 specs green, boundary values land per bin definition.
-- [ ] T16: Implement M3 hindsight + M4 optimism coefficients. — AC: vectors green; null (not NaN) below min-n handled at aggregation layer, functions return raw values + n.
+- [x] T16: Implement M3 hindsight + M4 optimism coefficients. — AC: vectors green; null (not NaN) below min-n handled at aggregation layer, functions return raw values + n.
 - [ ] T17: Implement M5 granularity + M6 horizon gap + M7 options count. — AC: vectors green; M6 excludes 31–90d forecasts.
 - [ ] T18: Implement M8 reversal frequency + M9 self-serving index. — AC: vectors green; M9 tie-valence = bad verified.
 - [ ] T19 [HAND]: Implement M10 surface rate (per-failure primary + per-decision companion). — AC: both vector values green; unknowable failures excluded.
