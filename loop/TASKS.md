@@ -27,7 +27,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 - [ ] T15 [HAND]: Implement M2 calibration-curve binning. — AC: M2 specs green, boundary values land per bin definition.
 - [x] T16: Implement M3 hindsight + M4 optimism coefficients. — AC: vectors green; null (not NaN) below min-n handled at aggregation layer, functions return raw values + n.
 - [x] T17: Implement M5 granularity + M6 horizon gap + M7 options count. — AC: vectors green; M6 excludes 31–90d forecasts.
-- [ ] T18: Implement M8 reversal frequency + M9 self-serving index. — AC: vectors green; M9 tie-valence = bad verified.
+- [x] T18: Implement M8 reversal frequency + M9 self-serving index. — AC: vectors green; M9 tie-valence = bad verified.
 - [ ] T19 [HAND]: Implement M10 surface rate (per-failure primary + per-decision companion). — AC: both vector values green; unknowable failures excluded.
 - [ ] T20 (deps: T14, T15, T19): Aggregation service `getDashboardMetrics`: data access behind an injected row-fetcher interface → pure functions; wire min-n rules. — AC: unit tests feed the T12 seed dataset as in-memory fixtures and equal the seed-header hand-computed values exactly (no DB in `pnpm check`); the thin Supabase-backed fetcher is exercised by `pnpm test:db`.
 
