@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { StatusBadge } from "../StatusBadge"
 import { CheckinTimeline } from "../CheckinTimeline"
+import { DecisionEventsPanel, type DecisionEvent } from "../DecisionEventsPanel"
 
 export default async function DecisionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -62,6 +63,14 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
     ...checkin,
     failures: (failureRows ?? []).filter((f) => f.checkin_id === checkin.id),
   }))
+
+  const { data: eventRows } = await supabase
+    .from("decision_events")
+    .select("id, event_type, payload, created_at")
+    .eq("decision_id", id)
+    .order("created_at", { ascending: true })
+
+  const events = (eventRows ?? []) as DecisionEvent[]
 
   const options = Array.isArray(decision.options_considered) ? (decision.options_considered as string[]) : []
 
@@ -127,6 +136,8 @@ export default async function DecisionDetailPage({ params }: { params: Promise<{
         </div>
 
         <CheckinTimeline checkins={checkins} />
+
+        <DecisionEventsPanel decisionId={id} events={events} active={decision.status === "active"} />
 
         {decision.status === "active" ? (
           <Link href={`/decisions/${id}/edit`} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
