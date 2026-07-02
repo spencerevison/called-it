@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
@@ -18,7 +19,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-3">
-        <span className="text-sm font-medium">Called It</span>
+        <Link href="/decisions" className="text-sm font-medium">
+          Called It
+        </Link>
         <form action={signOut}>
           <Button type="submit" variant="ghost" size="sm">
             Sign out
