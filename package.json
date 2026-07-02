@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:db": "vitest run --config vitest.db.config.ts",
+    "test:hand": "vitest run --config vitest.hand.config.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "db:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/lib/supabase/types.ts",
     "db:seed": "tsx scripts/seed.ts"

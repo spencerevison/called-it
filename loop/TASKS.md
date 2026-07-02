@@ -22,7 +22,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 
 ## P2 · Metrics library (pure functions; METRICS.md is normative)
 
-- [ ] T13: Transcribe **all** METRICS.md test vectors (M1–M10, including empty-input cases) into `src/lib/metrics/*.test.ts`, verbatim expected values; create typed function signatures for all ten metrics; stub `[HAND]` implementations (M1, M2, M10) with `throw new Error("HAND: not yet implemented")` ; their specs live in `*.hand.test.ts` files excluded from the default vitest config and run by a second config via `pnpm test:hand` (this file-split is the sanctioned mechanism — not a skipped test, no gate-rule violation). — AC: `pnpm check` green; `pnpm test:hand` runs exactly the HAND specs and fails.
+- [x] T13: Transcribe **all** METRICS.md test vectors (M1–M10, including empty-input cases) into `src/lib/metrics/*.test.ts`, verbatim expected values; create typed function signatures for all ten metrics; stub `[HAND]` implementations (M1, M2, M10) with `throw new Error("HAND: not yet implemented")` ; their specs live in `*.hand.test.ts` files excluded from the default vitest config and run by a second config via `pnpm test:hand` (this file-split is the sanctioned mechanism — not a skipped test, no gate-rule violation). — AC: `pnpm check` green; `pnpm test:hand` runs exactly the HAND specs and fails.
 - [ ] T14 [HAND]: Implement M1 Brier + rolling Brier. — AC: `pnpm test:hand` M1 specs green.
 - [ ] T15 [HAND]: Implement M2 calibration-curve binning. — AC: M2 specs green, boundary values land per bin definition.
 - [ ] T16: Implement M3 hindsight + M4 optimism coefficients. — AC: vectors green; null (not NaN) below min-n handled at aggregation layer, functions return raw values + n.
