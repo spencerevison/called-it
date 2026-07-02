@@ -14,13 +14,16 @@
     "test:hand": "vitest run --config vitest.hand.config.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "db:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/lib/supabase/types.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "trigger:dev": "trigger dev",
+    "trigger:deploy": "trigger deploy"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.0",
     "@base-ui/react": "^1.6.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
+    "@trigger.dev/sdk": "^4.4.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "langfuse": "^3.38.20",
@@ -43,6 +46,7 @@
     "eslint-config-next": "16.2.9",
     "supabase": "^2.109.0",
     "tailwindcss": "^4",
+    "trigger.dev": "^4.4.6",
     "tsx": "^4.22.4",
     "typescript": "^5",
     "vitest": "^4.1.9"
