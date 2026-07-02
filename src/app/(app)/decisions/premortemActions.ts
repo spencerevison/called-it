@@ -7,8 +7,10 @@ import { generatePremortemRisks } from "@/lib/premortem/generate"
 import { PREMORTEM_PROMPT_VERSION } from "@/lib/premortem/prompt"
 import { callAnthropic, ANTHROPIC_MODEL } from "@/lib/llm/anthropic"
 import { getLangfuseClient } from "@/lib/langfuse/client"
+import { parseRiskInput, type RiskFormErrors } from "./riskValidation"
 
 export type PremortemActionState = { ok: false; error: string } | null
+export type RiskActionState = { ok: false; errors: RiskFormErrors } | null
 
 export async function generatePremortem(decisionId: string): Promise<PremortemActionState> {
   const supabase = await createClient()
@@ -97,6 +99,39 @@ export async function generatePremortem(decisionId: string): Promise<PremortemAc
 
   if (risksError) {
     return { ok: false, error: "Could not save pre-mortem risks. Try again." }
+  }
+
+  revalidatePath(`/decisions/${decisionId}/edit`)
+  return null
+}
+
+// user's own risk, attached to an existing premortem -- source=user distinguishes it in the UI
+export async function addUserRisk(
+  decisionId: string,
+  premortemId: string,
+  _prev: RiskActionState,
+  formData: FormData,
+): Promise<RiskActionState> {
+  const parsed = parseRiskInput(formData)
+  if (!parsed.ok) return { ok: false, errors: parsed.errors }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect("/login")
+
+  const { error } = await supabase.from("premortem_risks").insert({
+    user_id: user.id,
+    premortem_id: premortemId,
+    description: parsed.value.description,
+    category: parsed.value.category,
+    severity: parsed.value.severity,
+    source: "user" as const,
+  })
+
+  if (error) {
+    return { ok: false, errors: { description: "Could not save risk. Try again." } }
   }
 
   revalidatePath(`/decisions/${decisionId}/edit`)
