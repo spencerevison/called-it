@@ -42,7 +42,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 - [x] T25: Pre-mortem review UI: risk list grouped by category with severity badges; add-own-risk (source=user); regenerate allowed on draft only. — AC: user risks persist and render distinctly.
 - [x] T26: Commit action: draft→active transition per DATA_MODEL integrity rule 1 (decided_at, `committed` event, three check-in rows at 2w/2m/6m with edit-before-confirm, decision-time fields frozen). — AC: transactional — partial failure leaves draft untouched; post-commit edit attempts rejected at the action layer.
 - [x] T27: Decision list (status filters) + decision detail page composing entry, forecasts, pre-mortem, check-in timeline. — AC: empty states designed, not blank.
-- [ ] T28: Decision events UI: revise (payload diff note) / reverse / reaffirm actions writing `decision_events`. — AC: events render as a timeline; reverse prompts for a one-line reason.
+- [x] T28: Decision events UI: revise (payload diff note) / reverse / reaffirm actions writing `decision_events`. — AC: events render as a timeline; reverse prompts for a one-line reason.
 
 ## P4 · Scheduling
 
