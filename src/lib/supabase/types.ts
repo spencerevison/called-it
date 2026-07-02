@@ -512,7 +512,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      commit_decision: {
+        Args: {
+          p_checkin_six_months: string
+          p_checkin_two_months: string
+          p_checkin_two_weeks: string
+          p_decision_id: string
+        }
+        Returns: {
+          chosen_option: string | null
+          context: string
+          created_at: string
+          decided_at: string | null
+          id: string
+          options_considered: Json
+          rationale: string | null
+          resolved_at: string | null
+          reversibility: Database["public"]["Enums"]["reversibility"]
+          stakes: Database["public"]["Enums"]["stakes_level"]
+          status: Database["public"]["Enums"]["decision_status"]
+          title: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "decisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       attribution: "skill" | "luck" | "mixed"

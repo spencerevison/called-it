@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { DecisionForm } from "../../DecisionForm"
 import { ForecastList } from "../../ForecastList"
 import { PremortemPanel } from "../../PremortemPanel"
+import { CommitPanel } from "../../CommitPanel"
 
 export default async function EditDecisionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -76,6 +77,8 @@ export default async function EditDecisionPage({ params }: { params: Promise<{ i
           premortemId={premortem?.id ?? null}
           risks={risks ?? []}
         />
+
+        {decision.status === "draft" ? <CommitPanel decisionId={id} /> : null}
       </main>
     </div>
   )
