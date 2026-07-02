@@ -18,7 +18,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 - [x] T09: Migration: `checkins` (incl. `overall_attribution`), `checkin_failures` + indexes. — AC: `linked_risk_id` FK nullable and enforced.
 - [x] T10: Migration: `prompt_versions`, `judge_scores`, `eval_items`, `eval_runs`. — AC: `judge_scores.prompt_version` FK enforced.
 - [x] T11: RLS on all user tables (select/insert/update/delete, `user_id = auth.uid()` + with-check); `prompt_versions` read-authenticated; eval tables service-role only. — AC: policy tests in `pnpm test:db` (requires `supabase start`; documented; NOT part of `pnpm check`/CI) — anon reads zero rows; user A cannot read user B's rows; authenticated insert with mismatched user_id rejected.
-- [ ] T12: Seed script: dataset matching METRICS.md §Aggregation-contract minimums; header comment documents every hand-computed metric value for the seed. — AC: `pnpm db:seed` idempotent.
+- [x] T12: Seed script: dataset matching METRICS.md §Aggregation-contract minimums; header comment documents every hand-computed metric value for the seed. — AC: `pnpm db:seed` idempotent.
 
 ## P2 · Metrics library (pure functions; METRICS.md is normative)
 

@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "test:db": "vitest run --config vitest.db.config.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "db:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/lib/supabase/types.ts"
+    "db:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_ID\" > src/lib/supabase/types.ts",
+    "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -38,6 +39,7 @@
     "eslint-config-next": "16.2.9",
     "supabase": "^2.109.0",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5",
     "vitest": "^4.1.9"
   }
