@@ -46,7 +46,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 
 ## P4 · Scheduling
 
-- [ ] T29: Trigger.dev setup (verify current SDK major against docs before scaffolding; note the version in PROGRESS) + `checkinReminder(checkinId)` task using `wait.until({ date: scheduled_for })`; on wake re-fetch row and self-noop unless status=pending; else set status=due; store run id on the row. — AC: unit-tested via extracted handler logic with mocked client; task file matches the current Trigger.dev SDK API.
+- [x] T29: Trigger.dev setup (verify current SDK major against docs before scaffolding; note the version in PROGRESS) + `checkinReminder(checkinId)` task using `wait.until({ date: scheduled_for })`; on wake re-fetch row and self-noop unless status=pending; else set status=due; store run id on the row. — AC: unit-tested via extracted handler logic with mocked client; task file matches the current Trigger.dev SDK API.
 - [ ] T30: Daily reconciliation cron task: `pending` rows with `scheduled_for < now()` → due. — AC: idempotent; covered by handler-logic test.
 - [ ] T31: Due inbox: app-wide badge count + `/due` list linking into check-in flow. — AC: count matches due rows; empty state present.
 - [ ] T32 [DEFER]: Email notification on due (Resend), one per transition. — AC: template renders decision title + link; no duplicate sends on cron re-runs.
