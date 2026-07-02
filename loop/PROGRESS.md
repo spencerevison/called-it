@@ -8,3 +8,4 @@ Appended by the loop, one line per iteration. Humans read bottom-up.
 2026-07-01T22:17:00Z | T02 | gates: pass | 12a8781 | GH Actions ci.yml (push/PR) pins node 22, pnpm 11.9.0, runs pnpm check
 2026-07-01T22:19:00Z | T03 | gates: pass | 7e8cc11 | @supabase/supabase-js 2.110.0 + @supabase/ssr 0.12.0; server/browser clients, .env.example (all vars), pnpm db:types stub against placeholder Database type until T05+ migrations exist
 2026-07-02T05:27:38Z | T04 | gates: pass | c9787a1 | @playwright/test 1.61.1; playwright.config.ts + e2e/smoke.spec.ts against pnpm dev webServer; vitest excludes e2e/**
+2026-07-02T05:41:00Z | T05 | gates: pass | pending | supabase CLI 2.109.0 as devDep + supabase init; migration 20260701000000_enums_and_profiles.sql (10 enums + profiles); verified via `supabase db reset` against local Docker Postgres (analytics service disabled in config.toml, unrelated to migration)
