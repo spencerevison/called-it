@@ -121,6 +121,20 @@ export async function addUserRisk(
   } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
+  // premortemId is client-supplied -- confirm it actually belongs to this user's decision
+  // before attaching a row to it (RLS only checks the inserted row's own user_id, not this FK)
+  const { data: premortem } = await supabase
+    .from("premortems")
+    .select("id")
+    .eq("id", premortemId)
+    .eq("decision_id", decisionId)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (!premortem) {
+    return { ok: false, errors: { description: "Pre-mortem not found." } }
+  }
+
   const { error } = await supabase.from("premortem_risks").insert({
     user_id: user.id,
     premortem_id: premortemId,
