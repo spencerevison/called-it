@@ -36,7 +36,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 *(All UI tasks from here on follow `DESIGN.md`. While its Direction section is TODO: neutral shadcn through semantic tokens, structure and hierarchy over identity, no invented visual flourish.)*
 
 - [x] T21: Supabase Auth (magic link), protected app layout, sign-out. — AC: unauthenticated visit to app routes redirects; session persists reload.
-- [ ] T22: Decision create/edit (draft): title, context, rationale, options (dynamic list, min 1), chosen option (one of the options), stakes, reversibility. — AC: draft persists; `chosen_option` stored; validation messages accessible (label/`aria-describedby`).
+- [x] T22: Decision create/edit (draft): title, context, rationale, options (dynamic list, min 1), chosen option (one of the options), stakes, reversibility. — AC: draft persists; `chosen_option` stored; validation messages accessible (label/`aria-describedby`).
 - [ ] T23: Forecast add/edit on a draft/active decision: question, probability slider+input (0.01–0.99), desired toggle, resolve-by. — AC: stored as numeric; desired defaults true.
 - [ ] T24: Pre-mortem generation server action: template loader renders `prompts/premortem_v1.md` with decision fields (`horizon_months` = 6, the final check-in horizon); Anthropic call; parse/validate JSON; persist premortem + risks (source=ai) with prompt_version + Langfuse trace id. — AC: fully mocked unit tests incl. malformed-JSON retry-once-then-error path; live path behind env key.
 - [ ] T25: Pre-mortem review UI: risk list grouped by category with severity badges; add-own-risk (source=user); regenerate allowed on draft only. — AC: user risks persist and render distinctly.
