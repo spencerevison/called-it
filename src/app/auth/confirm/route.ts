@@ -9,7 +9,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const tokenHash = searchParams.get("token_hash")
   const type = searchParams.get("type") as EmailOtpType | null
-  const next = searchParams.get("next") ?? "/"
+  const rawNext = searchParams.get("next") ?? "/"
+  // only relative paths are safe -- reject anything that could redirect off-site
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/"
 
   if (tokenHash && type) {
     const supabase = await createClient()
