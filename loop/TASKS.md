@@ -5,7 +5,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 ## P0 · Scaffold
 
 - [x] T01: Init Next.js 16 (App Router) — or newer current major at install time, per SPEC version policy + TypeScript strict + Tailwind + shadcn/ui, pnpm. — AC: `pnpm dev` boots; `pnpm check` script exists (typecheck && lint && vitest run) and passes; strict mode on, no `any` in template code; the full semantic token set from `DESIGN.md` is defined as CSS `@theme`/`:root` variables (Tailwind v4 is CSS-first — no JS theme config) with placeholder values (all UI from here on uses tokens only — DESIGN.md's hard convention is binding).
-- [ ] T02: GitHub Actions CI running `pnpm check` on push/PR. — AC: workflow file present; passes on a clean clone (document node/pnpm versions).
+- [x] T02: GitHub Actions CI running `pnpm check` on push/PR. — AC: workflow file present; passes on a clean clone (document node/pnpm versions).
 - [ ] T03: Supabase client setup (server + browser helpers), `.env.example` with every var the project will need (Supabase, Anthropic, Trigger.dev, Langfuse, Resend placeholder), typegen script (`pnpm db:types`). — AC: helpers typed; no secrets committed.
 - [ ] T04: Vitest config + example unit test; Playwright config + placeholder smoke (`pnpm test:e2e`). — AC: both runners green locally.
 
