@@ -138,7 +138,7 @@ create table judge_scores (
   prompt_version text not null references prompt_versions(id),
   model text not null,
   scores jsonb not null,        -- {risk_comprehensiveness, calibration_given_knowable, process_quality} ints 1–5
-  rationale jsonb not null,     -- per-dimension rationale + cited evidence spans
+  rationale jsonb not null,     -- {rationale:{<dim>:text}, evidence_spans:[...]} — the judge output's top-level evidence_spans array nests here (no separate column)
   contamination boolean not null default false,  -- judge flagged outcome info in input
   langfuse_trace_id text,
   created_at timestamptz not null default now()

@@ -1,7 +1,7 @@
 ---
 name: escalation-debugger
 description: Root-cause diagnosis for a task that has failed gates twice with distinct approaches. Invoke ONLY when the failure protocol in loop/PROMPT.md directs — never proactively, never for first failures.
-model: claude-fable-5   # AFTER JULY 7: flip to claude-opus-4-8 (Fable retires)
+model: claude-fable-5
 effort: high
 tools: Read, Grep, Glob, Bash
 ---

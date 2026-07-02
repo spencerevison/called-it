@@ -4,7 +4,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 
 ## P0 · Scaffold
 
-- [ ] T01: Init Next.js 16 (App Router) — or newer current major at install time, per SPEC version policy + TypeScript strict + Tailwind + shadcn/ui, pnpm. — AC: `pnpm dev` boots; `pnpm check` script exists (typecheck && lint && vitest run) and passes; strict mode on, no `any` in template code; Tailwind config defines the full semantic token set from `DESIGN.md` with placeholder values (all UI from here on uses tokens only — DESIGN.md's hard convention is binding).
+- [ ] T01: Init Next.js 16 (App Router) — or newer current major at install time, per SPEC version policy + TypeScript strict + Tailwind + shadcn/ui, pnpm. — AC: `pnpm dev` boots; `pnpm check` script exists (typecheck && lint && vitest run) and passes; strict mode on, no `any` in template code; the full semantic token set from `DESIGN.md` is defined as CSS `@theme`/`:root` variables (Tailwind v4 is CSS-first — no JS theme config) with placeholder values (all UI from here on uses tokens only — DESIGN.md's hard convention is binding).
 - [ ] T02: GitHub Actions CI running `pnpm check` on push/PR. — AC: workflow file present; passes on a clean clone (document node/pnpm versions).
 - [ ] T03: Supabase client setup (server + browser helpers), `.env.example` with every var the project will need (Supabase, Anthropic, Trigger.dev, Langfuse, Resend placeholder), typegen script (`pnpm db:types`). — AC: helpers typed; no secrets committed.
 - [ ] T04: Vitest config + example unit test; Playwright config + placeholder smoke (`pnpm test:e2e`). — AC: both runners green locally.
@@ -29,16 +29,16 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 - [ ] T17: Implement M5 granularity + M6 horizon gap + M7 options count. — AC: vectors green; M6 excludes 31–90d forecasts.
 - [ ] T18: Implement M8 reversal frequency + M9 self-serving index. — AC: vectors green; M9 tie-valence = bad verified.
 - [ ] T19 [HAND]: Implement M10 surface rate (per-failure primary + per-decision companion). — AC: both vector values green; unknowable failures excluded.
-- [ ] T20: Aggregation service `getDashboardMetrics`: data access behind an injected row-fetcher interface → pure functions; wire min-n rules. — AC: unit tests feed the T12 seed dataset as in-memory fixtures and equal the seed-header hand-computed values exactly (no DB in `pnpm check`); the thin Supabase-backed fetcher is exercised by `pnpm test:db`.
+- [ ] T20 (deps: T14, T15, T19): Aggregation service `getDashboardMetrics`: data access behind an injected row-fetcher interface → pure functions; wire min-n rules. — AC: unit tests feed the T12 seed dataset as in-memory fixtures and equal the seed-header hand-computed values exactly (no DB in `pnpm check`); the thin Supabase-backed fetcher is exercised by `pnpm test:db`.
 
 ## P3 · Core flows
 
 *(All UI tasks from here on follow `DESIGN.md`. While its Direction section is TODO: neutral shadcn through semantic tokens, structure and hierarchy over identity, no invented visual flourish.)*
 
 - [ ] T21: Supabase Auth (magic link), protected app layout, sign-out. — AC: unauthenticated visit to app routes redirects; session persists reload.
-- [ ] T22: Decision create/edit (draft): title, context, rationale, options (dynamic list, min 1), stakes, reversibility. — AC: draft persists; validation messages accessible (label/`aria-describedby`).
+- [ ] T22: Decision create/edit (draft): title, context, rationale, options (dynamic list, min 1), chosen option (one of the options), stakes, reversibility. — AC: draft persists; `chosen_option` stored; validation messages accessible (label/`aria-describedby`).
 - [ ] T23: Forecast add/edit on a draft/active decision: question, probability slider+input (0.01–0.99), desired toggle, resolve-by. — AC: stored as numeric; desired defaults true.
-- [ ] T24: Pre-mortem generation server action: template loader renders `prompts/premortem_v1.md` with decision fields; Anthropic call; parse/validate JSON; persist premortem + risks (source=ai) with prompt_version + Langfuse trace id. — AC: fully mocked unit tests incl. malformed-JSON retry-once-then-error path; live path behind env key.
+- [ ] T24: Pre-mortem generation server action: template loader renders `prompts/premortem_v1.md` with decision fields (`horizon_months` = 6, the final check-in horizon); Anthropic call; parse/validate JSON; persist premortem + risks (source=ai) with prompt_version + Langfuse trace id. — AC: fully mocked unit tests incl. malformed-JSON retry-once-then-error path; live path behind env key.
 - [ ] T25: Pre-mortem review UI: risk list grouped by category with severity badges; add-own-risk (source=user); regenerate allowed on draft only. — AC: user risks persist and render distinctly.
 - [ ] T26: Commit action: draft→active transition per DATA_MODEL integrity rule 1 (decided_at, `committed` event, three check-in rows at 2w/2m/6m with edit-before-confirm, decision-time fields frozen). — AC: transactional — partial failure leaves draft untouched; post-commit edit attempts rejected at the action layer.
 - [ ] T27: Decision list (status filters) + decision detail page composing entry, forecasts, pre-mortem, check-in timeline. — AC: empty states designed, not blank.
@@ -46,7 +46,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 
 ## P4 · Scheduling
 
-- [ ] T29: Trigger.dev setup (verify current SDK major against docs before scaffolding; note the version in PROGRESS) + `checkinReminder(checkinId)` task using `wait.until(scheduled_for)`; on wake re-fetch row and self-noop unless status=pending; else set status=due; store run id on the row. — AC: unit-tested via extracted handler logic with mocked client; task file matches the current Trigger.dev SDK API.
+- [ ] T29: Trigger.dev setup (verify current SDK major against docs before scaffolding; note the version in PROGRESS) + `checkinReminder(checkinId)` task using `wait.until({ date: scheduled_for })`; on wake re-fetch row and self-noop unless status=pending; else set status=due; store run id on the row. — AC: unit-tested via extracted handler logic with mocked client; task file matches the current Trigger.dev SDK API.
 - [ ] T30: Daily reconciliation cron task: `pending` rows with `scheduled_for < now()` → due. — AC: idempotent; covered by handler-logic test.
 - [ ] T31: Due inbox: app-wide badge count + `/due` list linking into check-in flow. — AC: count matches due rows; empty state present.
 - [ ] T32 [DEFER]: Email notification on due (Resend), one per transition. — AC: template renders decision title + link; no duplicate sends on cron re-runs.
@@ -56,7 +56,7 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 - [ ] T33: Check-in flow step 1–2: outcome notes; then per open forecast — recalled-probability capture **before** the recorded value exists anywhere in the response payload/DOM, then reveal recorded + capture outcome (yes/no/can't-resolve-yet). — AC: an integration test asserts the recalled-step server response excludes recorded probabilities; DATA_MODEL integrity rule 2 enforced.
 - [ ] T34: Check-in flow step 3–4: failures (description, was_knowable, link to a pre-mortem risk via picker or "unlisted", attribution per failure); required `overall_attribution`; complete check-in. — AC: completing without overall_attribution blocked; links persist.
 - [ ] T35: Resolution: from any check-in (or decision page), mark decision resolved/abandoned → `resolved_at`, terminal event, remaining check-ins skipped. — AC: skipped check-ins never turn due (T29/T30 respect terminal states).
-- [ ] T36 [E2E]: Playwright happy path: sign in (test helper) → create decision → forecasts → mocked pre-mortem → commit → test hook forces a check-in due → complete check-in with one linked + one unlisted failure → resolve → dashboard reflects it. — AC: runs headless locally with mocked LLM; < 90s; e2e-in-CI is a [DEFER] follow-up (needs DB + app services in CI — do not block on it).
+- [ ] T36 [E2E]: Playwright happy path: sign in (test helper) → create decision → forecasts → mocked pre-mortem → commit → test hook forces a check-in due → complete check-in with one linked + one unlisted failure → resolve; assert final state on the decision detail page (status=resolved, failure links + attribution present). — AC: runs headless locally with mocked LLM; < 90s; ends at the decision detail page — the dashboard is P8, so this stays a core-flow smoke and does NOT assert dashboard state (dashboard correctness is covered by T20's aggregation integration test against the seed + T46–T49 render tests; no full-stack E2E through P8 is needed); e2e-in-CI is a [DEFER] follow-up (needs DB + app services in CI — do not block on it).
 
 ## P6 · Judge
 
@@ -77,10 +77,10 @@ One task per loop iteration. Tags: `[HAND]` = Spence implements (loop stubs + te
 
 ## P8 · Dashboard
 
-- [ ] T46: Dashboard shell: summary cards (decisions, resolved, open check-ins, Brier headline) with min-n states. — AC: matches seed hand-values.
-- [ ] T47: Calibration curve chart (perfect-calibration diagonal, bin dots sized by n, n<5 greyed) + Brier trend (rolling). — AC: renders from seed; keyboard-focusable tooltips.
-- [ ] T48: Bias panel: hindsight (M3), optimism (M4 with control line), self-serving (M9) — each with its plain-language sentence per METRICS.md display rule. — AC: sentences render with live values interpolated; min-n fallbacks.
-- [ ] T49: Behavior panel: granularity (M5), horizon gap (M6), options count (M7), reversal (M8), surface rate (M10). — AC: same display-rule compliance.
+- [ ] T46 (deps: T20): Dashboard shell: summary cards (decisions, resolved, open check-ins, Brier headline) with min-n states. — AC: matches seed hand-values.
+- [ ] T47 (deps: T20): Calibration curve chart (perfect-calibration diagonal, bin dots sized by n, n<5 greyed) + Brier trend (rolling). — AC: renders from seed; keyboard-focusable tooltips.
+- [ ] T48 (deps: T20): Bias panel: hindsight (M3), optimism (M4 with control line), self-serving (M9) — each with its plain-language sentence per METRICS.md display rule. — AC: sentences render with live values interpolated; min-n fallbacks.
+- [ ] T49 (deps: T20): Behavior panel: granularity (M5), horizon gap (M6), options count (M7), reversal (M8), surface rate (M10). — AC: same display-rule compliance.
 - [ ] T50: Dashboard empty/threshold states: a new user sees what will unlock and at what n, not a wall of "insufficient data." — AC: copy reviewed against SPEC G2 intent.
 
 ## P9 · Ship

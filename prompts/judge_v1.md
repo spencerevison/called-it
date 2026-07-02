@@ -3,7 +3,7 @@
 kind: judge
 model: claude-sonnet-5
 rubric_version: v1
-notes: Outcome-blind by construction (ADR-3). The rubric text below must stay verbatim-identical to JUDGE_RUBRIC.md — the build registers a content hash of the rubric section and fails startup on drift.
+notes: Outcome-blind by construction (ADR-3). The anchors below are a condensed restatement of JUDGE_RUBRIC.md's anchors — same scoring semantics, trimmed for prompt length. JUDGE_RUBRIC.md is the source of truth; keep the two in sync whenever the rubric version bumps (see JUDGE_RUBRIC §Protocol). T37 hashes each prompt file against its own registered hash; it does not cross-check the rubric text.
 
 ---SYSTEM---
 

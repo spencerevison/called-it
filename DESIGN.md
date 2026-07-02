@@ -1,7 +1,7 @@
 # Design Direction — called-it
 
 **Status:** Direction PENDING (Spence + Fable session, due before P8; P3–P7 build on placeholder tokens).
-**Hard convention (in force from T01, non-negotiable):** All UI styling uses the semantic tokens defined in the Tailwind config below — never raw palette values (`bg-zinc-100`), never hex, never one-off arbitrary values. This makes the visual identity late-bindable: when this doc's Direction section is filled in, applying it is a token swap, not a refactor. The loop must not invent a visual identity; until Direction is filled, neutral shadcn defaults expressed through these tokens are correct.
+**Hard convention (in force from T01, non-negotiable):** All UI styling uses the semantic tokens defined as CSS variables (`@theme`/`:root`, the shadcn + Tailwind v4 pattern) below — never raw palette values (`bg-zinc-100`), never hex, never one-off arbitrary values. This makes the visual identity late-bindable: when this doc's Direction section is filled in, applying it is a token swap, not a refactor. The loop must not invent a visual identity; until Direction is filled, neutral shadcn defaults expressed through these tokens are correct.
 
 ## Semantic tokens (placeholder values until Direction lands)
 
@@ -32,5 +32,5 @@ Type: two-role scale only — `font-sans` for UI, `font-mono` for numbers/probab
 
 1. Semantic tokens only, per the hard convention above.
 2. Numbers are mono, always.
-3. If a needed token doesn't exist, add it to the table here AND the config in the same commit — never inline a value.
+3. If a needed token doesn't exist, add it to the table here AND the CSS `@theme`/`:root` definitions in the same commit — never inline a value.
 4. Do not attempt visual flourish while Direction is TODO. Structure, hierarchy, and accessibility now; identity later.

@@ -3,7 +3,7 @@
 **Name:** Called It (repo: `called-it`) — named for the claim the tool exists to test
 **Status:** Approved for build · **Owner:** Spencer Campbell · **Date:** 2026-07-01
 **Role in job search:** Portfolio Project 2 (absorbs the Project 3 AI-signal slot per plan v3)
-**Companion docs:** `DATA_MODEL.md` · `METRICS.md` · `JUDGE_RUBRIC.md` · `EVAL_PLAN.md` · `prompts/` · `loop/`
+**Companion docs:** `DATA_MODEL.md` · `METRICS.md` · `JUDGE_RUBRIC.md` · `EVAL_PLAN.md` · `DESIGN.md` · `prompts/` · `loop/`
 
 ---
 
@@ -75,7 +75,7 @@ Log decision (title, context, options, chosen, stakes, reversibility, rationale)
 | F4 | Scheduling | Durable check-ins at 2w/2m/6m (editable at commit) via Trigger.dev `wait.until`; DB row is source of truth; task self-noops if row no longer pending; daily reconciliation cron marks overdue rows due; in-app "due" inbox | Given a check-in row deleted after scheduling, when the task wakes, then nothing happens; given a missed task, when the daily cron runs, then the row is marked due |
 | F5 | Check-in | Flow: outcome notes → recalled-p per open forecast → reveal + resolve → failures (each linked to a pre-mortem risk or "unlisted") → luck/skill/mixed attribution per failure → optional final resolution | Given a completed check-in with 2 failures, then each failure has an attribution and a link target (risk id or unlisted) |
 | F6 | Judge | Outcome-blind LLM judge scores 3 rubric dimensions (see `JUDGE_RUBRIC.md`) on decision-time artifacts only; strict JSON output; prompt files are source of truth, registered in `prompt_versions`; scores hidden behind "experimental" label until eval bar (G3) is met | Given a judge call, then the assembled input contains no outcome/check-in fields (assertion test), and output validates against the JSON schema |
-| F7 | Metrics | All metrics in `METRICS.md` implemented as pure functions with the documented test vectors; dashboard shows: calibration curve, Brier trend, horizon gap, hindsight/optimism/self-serving panel, granularity, options count, reversal frequency, pre-mortem surface rate — each with a one-line plain-language interpretation | Given the seed dataset, then every dashboard number equals the hand-computed vector in `METRICS.md` |
+| F7 | Metrics | All metrics in `METRICS.md` implemented as pure functions with the documented test vectors; dashboard shows: calibration curve, Brier trend, horizon gap, hindsight/optimism/self-serving panel, granularity, options count, reversal frequency, pre-mortem surface rate — each with a one-line plain-language interpretation | Given the seed dataset, every dashboard metric equals the hand-computed value documented in the seed-file header (per `METRICS.md` §Aggregation contract), rendering "insufficient data" where the seed is below a metric's min-n (M3/M4/M6/M9); the `METRICS.md` M1–M10 test vectors are separate input arrays, unit-tested in T13 (not reproduced by the seed) |
 | F8 | Eval harness | Gold-set import (`goldset/*.json`); `pnpm eval:judge` (agreement: within-1 %, exact %, MAE per dimension); `pnpm eval:premortem` (surface rate); `pnpm eval:compare` (A/B delta table); runs persisted to `eval_runs`; markdown report output; CI runs a 3-fixture mocked smoke | Given gold set n ≥ 20 and two prompt versions, when compare runs, then a delta table is produced and persisted |
 | F9 | Auth/infra | Supabase Auth (magic link), RLS on all user tables, `.env.example`, GitHub Actions CI (`pnpm check` = typecheck + lint + unit tests), Vercel deploy | Given anon credentials, then no user rows are readable (policy test) |
 

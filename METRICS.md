@@ -99,6 +99,8 @@ Unknowable failures (`was_knowable = false`) are excluded — the pre-mortem is 
 
 `getDashboardMetrics(userId)` returns all of the above from live rows, computed via the pure functions. Integration test: run against the seed dataset (T12), assert equality with hand-computed values documented in the seed file's header comment. The seed must include at least: 12 forecasts (7 resolved), 2 recalled-probability pairs, 4 desired resolved forecasts, short+long horizon coverage, 3 committed decisions with 1 reversal, 2 completed check-ins with linked and unlisted failures.
 
+Note this seed is intentionally **below min-n** for M3 (needs 5), M4 (needs 5 desired), M6 (needs 5/side), and M9 (needs 4/side): those four assert the **insufficient-data** state here (the header documents them as such), while M1/M2/M5/M7/M8/M10 assert numbers. Per-metric numeric correctness lives in the T13 vectors; this integration test validates the row→input mapping and the min-n gating, exercising both paths. To validate a *computed* M3/M4/M6/M9 value end-to-end from live rows, raise those counts past their thresholds (M9 is the expensive one — 4 good + 4 bad check-ins).
+
 ## Display rules
 
 Every dashboard metric renders: the number, the min-n state, and **one plain-language sentence** (templates live with the components, e.g. `"Your memory shifts {X} points toward the outcome after the fact"` for M3). No metric ships without its sentence — the sentences are the product.

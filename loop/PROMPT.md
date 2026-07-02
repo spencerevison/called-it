@@ -6,11 +6,12 @@ You are Claude Code building the Called It defined in `SPEC.md`. This file is yo
 
 1. `loop/TASKS.md` — find your task (rules below)
 2. `loop/PROGRESS.md` — last 10 lines, for context on where the build is
-3. `SPEC.md` sections relevant to the task, plus whichever companion doc the task cites (`DATA_MODEL.md`, `METRICS.md`, `JUDGE_RUBRIC.md`, `EVAL_PLAN.md`)
+3. `SPEC.md` sections relevant to the task, plus whichever companion doc the task cites (`DATA_MODEL.md`, `METRICS.md`, `JUDGE_RUBRIC.md`, `EVAL_PLAN.md`, `DESIGN.md` — the last for any UI task, per the P3 header note)
 
 ## Task selection
 
 - Take the **first** unchecked task (`- [ ]`) that is not tagged `[HAND]` or `[BLOCKED: …]`, respecting listed dependencies.
+- A task carrying `(deps: T##, …)` is **skipped** until every listed task is checked — even if it's the first unchecked one. This is how `[HAND]`-dependent tasks (e.g. the aggregation/dashboard tasks that call the `[HAND]` metric fns) avoid being attempted against still-throwing stubs; leave them for a later run after Spence lands the `[HAND]` trio.
 - `[HAND]` tasks are Spence's to implement. Never implement them. Where a `[HAND]` task's tests or type signatures are owed by an earlier task (T13), they already exist — leave the implementation stubbed with `throw new Error("HAND: not yet implemented")` so the suite shows them red, and exclude those specs from the CI gate via the documented tag (see T13 AC).
 - `[DEFER]` tasks are skipped until every non-`[DEFER]`, non-`[HAND]` task is checked or blocked.
 - **Durable attempt memory:** before starting a task, scan `loop/PROGRESS.md` for prior `gates: fail` or `gates: incomplete` lines against this task id. Each prior failed attempt counts as a used rung on the failure ladder below — a task that failed once in an earlier session starts at rung 2 (one more different approach, then escalate), not at zero.

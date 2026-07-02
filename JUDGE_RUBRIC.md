@@ -1,6 +1,6 @@
 # Judge Rubric — v1
 
-The judge scores **decision process quality at decision time**, never outcomes. It runs outcome-blind by construction (ADR-3): its input contains only decision-time artifacts. This rubric is shared verbatim by (a) the judge prompt, (b) Spence when hand-labeling the gold set, and (c) the eval harness's agreement math. One rubric, three consumers — drift between them invalidates the eval.
+The judge scores **decision process quality at decision time**, never outcomes. It runs outcome-blind by construction (ADR-3): its input contains only decision-time artifacts. This rubric has three consumers: (a) the judge prompt (`prompts/judge_v1.md`, which carries a condensed-but-semantically-identical restatement of the anchors, trimmed for prompt length), (b) Spence when hand-labeling the gold set, and (c) the eval harness's agreement math. This file is the source of truth for all three; a **semantic** drift between them invalidates the eval, so re-review the judge prompt's anchors whenever the rubric version bumps.
 
 ## Input (assembled by T38, assertion-tested outcome-free)
 
