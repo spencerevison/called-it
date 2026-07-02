@@ -5,3 +5,4 @@ Appended by the loop, one line per iteration. Humans read bottom-up.
 
 ---
 2026-07-02T05:15:41Z | T01 | gates: pass | ee05d05 | Next.js 16.2.9, React 19.2.4, Tailwind v4.3.2, shadcn base-nova style, vitest 4.1.9, pnpm 11.9.0; full DESIGN.md semantic token set wired in globals.css @theme
+2026-07-01T22:17:00Z | T02 | gates: pass | 12a8781 | GH Actions ci.yml (push/PR) pins node 22, pnpm 11.9.0, runs pnpm check
