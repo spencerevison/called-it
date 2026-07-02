@@ -11,3 +11,18 @@ docs/eval/detail/
 !.claude
 !.claude/**
 .claude/settings.local.json
+
+# next.js
+/out/
+/build
+/coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# misc
+.DS_Store
+*.pem
+.vercel
+npm-debug.log*
+yarn-debug.log*
+.pnpm-debug.log*
