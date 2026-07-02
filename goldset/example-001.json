@@ -1,0 +1,45 @@
+{
+  "id": "gs-example-001",
+  "_note": "Worked example — FICTIONAL scenario (no real people, projects, or employers). Shows the register and labeling depth to copy. Your real entries are gitignored by default; write decision.context BEFORE re-reading how things ended.",
+  "decision": {
+    "title": "Rewrite the notification service vs incremental strangler-fig refactor",
+    "context": "Team of three owns an aging Node notification service: duplicated retry logic across four code paths, worst on-call burden in the org, and a committed Q3 feature that depends on it. The senior engineer who owns the legacy retry logic has flagged burnout and dropped to reduced availability. A full rewrite has been proposed twice before and rejected for risk.",
+    "rationale": "Chose the strangler-fig incremental path. A full rewrite risks the Q3 commitment and repeats the pattern of big-bang proposals dying mid-flight; deferring entirely leaves the on-call burden compounding. Incremental migration keeps shipping while capping downside — if it stalls, we still have a working (if ugly) service, whereas a stalled rewrite leaves us maintaining two.",
+    "options_considered": [
+      "Full rewrite on the new platform stack",
+      "Strangler-fig incremental migration, top paths first",
+      "Defer: contractor patches the worst retry bugs, revisit next year"
+    ],
+    "chosen_option": "Strangler-fig incremental migration, top paths first",
+    "decided_on": "2025-03-10",
+    "stakes": "medium",
+    "reversibility": "two_way"
+  },
+  "forecasts": [
+    { "question": "Migration of the top three notification paths is complete within 90 days", "probability": 0.75, "desired": true, "outcome": false },
+    { "question": "On-call pages attributed to the service drop by half within the quarter", "probability": 0.6, "desired": true, "outcome": true },
+    { "question": "We end up doing a full rewrite anyway within 12 months", "probability": 0.2, "desired": false, "outcome": false }
+  ],
+  "outcome": {
+    "summary": "Migration finished at 130 days, not 90 — the senior engineer left at week six and the undocumented legacy retry behavior took weeks to reverse-engineer. Pages did drop by more than half. No rewrite followed.",
+    "failures": [
+      { "description": "Senior engineer departed at week six, taking undocumented knowledge of the legacy retry logic; the burnout signal was visible at decision time", "was_knowable": true },
+      { "description": "Dual-write phase ran twice as long as planned, roughly doubling the service's infra cost for a quarter", "was_knowable": true }
+    ]
+  },
+  "human_labels": {
+    "judge_scores": { "risk_comprehensiveness": 3, "calibration_given_knowable": 4, "process_quality": 4 },
+    "score_rationales": {
+      "risk_comprehensiveness": "Rationale engages schedule risk and the stalled-rewrite failure mode, but never names the bus-factor risk despite the burnout signal being in the record, and dual-write cost goes unmentioned: 3.",
+      "calibration_given_knowable": "0.75 / 0.6 / 0.2 are differentiated and track the stated evidence (committed deadline, known pain, prior rewrite rejections); no base-rate reasoning about migration slippage, so 4 not 5.",
+      "process_quality": "Three real options with explicit tradeoffs and a reasoned downside cap (stalled-incremental beats stalled-rewrite); no disconfirming step and no kill criterion for abandoning the migration: 4."
+    },
+    "expected_premortem_risks": [
+      "The senior owner of the legacy retry logic becomes unavailable mid-migration (burnout signal already visible)",
+      "Dual-write phase runs long, doubling infra cost and eroding stakeholder patience",
+      "Hidden coupling in the legacy retry paths makes 'top three paths' larger than scoped",
+      "Q3 feature work and migration compete for the same three people",
+      "The 'pages drop by half' target gets gamed by silencing alerts rather than fixing causes"
+    ]
+  }
+}

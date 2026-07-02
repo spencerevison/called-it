@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.env
+.env*.local
+loop/loop.log
+.loop-stop
+goldset/*.json
+!goldset/example-001.json
+docs/eval/detail/
+.vscode/
+!.claude
+!.claude/**
+.claude/settings.local.json
