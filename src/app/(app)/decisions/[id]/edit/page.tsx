@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DecisionForm } from "../../DecisionForm"
+import { ForecastList } from "../../ForecastList"
 
 export default async function EditDecisionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -13,28 +14,43 @@ export default async function EditDecisionPage({ params }: { params: Promise<{ i
     .eq("id", id)
     .single()
 
-  if (!decision || decision.status !== "draft") {
+  if (!decision || (decision.status !== "draft" && decision.status !== "active")) {
     notFound()
   }
 
+  const { data: forecasts } = await supabase
+    .from("forecasts")
+    .select("id, question, probability, desired, resolve_by, resolved")
+    .eq("decision_id", id)
+    .order("created_at", { ascending: true })
+
   return (
     <div className="flex flex-1 flex-col items-center bg-background text-foreground">
-      <main className="flex w-full max-w-lg flex-col gap-4 px-6 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight">Edit decision</h1>
-        <DecisionForm
-          decision={{
-            id: decision.id,
-            title: decision.title,
-            context: decision.context,
-            rationale: decision.rationale,
-            options_considered: Array.isArray(decision.options_considered)
-              ? (decision.options_considered as string[])
-              : [],
-            chosen_option: decision.chosen_option,
-            stakes: decision.stakes,
-            reversibility: decision.reversibility,
-          }}
-        />
+      <main className="flex w-full max-w-lg flex-col gap-8 px-6 py-12">
+        <div className="flex flex-col gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Edit decision</h1>
+          {decision.status === "draft" ? (
+            <DecisionForm
+              decision={{
+                id: decision.id,
+                title: decision.title,
+                context: decision.context,
+                rationale: decision.rationale,
+                options_considered: Array.isArray(decision.options_considered)
+                  ? (decision.options_considered as string[])
+                  : [],
+                chosen_option: decision.chosen_option,
+                stakes: decision.stakes,
+                reversibility: decision.reversibility,
+              }}
+            />
+          ) : (
+            // active decisions freeze decision-time fields -- edits only via events (T28)
+            <p className="text-sm text-muted-foreground">{decision.title}</p>
+          )}
+        </div>
+
+        <ForecastList decisionId={id} forecasts={forecasts ?? []} />
       </main>
     </div>
   )
