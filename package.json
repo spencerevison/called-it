@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "test:db": "vitest run -c vitest.config.db.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts"
+    "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
+    "db:seed": "node scripts/seed.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
