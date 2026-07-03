@@ -8,8 +8,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
-    // playwright owns e2e/ — keep it out of the vitest test.include net
-    exclude: [...configDefaults.exclude, "e2e/**"],
+    // playwright owns e2e/, db-tests/ needs a live supabase (see test:db) —
+    // keep both out of the default vitest test.include net
+    exclude: [...configDefaults.exclude, "e2e/**", "db-tests/**"],
   },
   resolve: {
     alias: {
