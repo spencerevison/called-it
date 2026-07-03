@@ -38,8 +38,14 @@ const generatePremortemRisks = vi.fn();
 vi.mock("@/lib/llm/premortem", () => ({ generatePremortemRisks }));
 
 vi.mock("@/lib/prompts/template", () => ({
-  loadPromptTemplate: vi.fn(async () => ({ model: "claude-sonnet-5", system: "sys", user: "user {{title}}" })),
-  renderTemplate: vi.fn((template: string) => template),
+  loadPromptTemplate: vi.fn(async () => ({
+    model: "claude-sonnet-5",
+    system: "sys {{horizon_months}}",
+    user: "user {{title}}",
+  })),
+  renderTemplate: vi.fn((template: string, ctx: Record<string, unknown>) =>
+    template.replace(/\{\{(\w+)\}\}/g, (match, key) => (key in ctx ? String(ctx[key]) : match)),
+  ),
 }));
 
 const startTrace = vi.fn(() => ({ traceId: "trace-1", end: vi.fn() }));
@@ -163,6 +169,9 @@ describe("generatePremortem", () => {
     const result = await generatePremortem("d1");
 
     expect(result).toEqual({ ok: true, id: "pm1" });
+    const callArgs = generatePremortemRisks.mock.calls[0][0];
+    expect(callArgs.system).toContain("6");
+    expect(callArgs.system).not.toContain("{{");
     expect(risksInsert).toHaveBeenCalledWith(
       risks.map((r) => ({
         user_id: "u1",

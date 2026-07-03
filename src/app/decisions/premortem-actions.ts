@@ -49,7 +49,7 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     .order("created_at");
 
   const template = await loadPromptTemplate(PROMPT_VERSION);
-  const userPrompt = renderTemplate(template.user, {
+  const promptContext = {
     title: decision.title,
     context: decision.context,
     options_considered: options.join(", "),
@@ -59,7 +59,9 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     reversibility: decision.reversibility,
     horizon_months: HORIZON_MONTHS,
     forecasts: forecasts ?? [],
-  });
+  };
+  const userPrompt = renderTemplate(template.user, promptContext);
+  const systemPrompt = renderTemplate(template.system, promptContext);
 
   const trace = startTrace({
     name: "premortem",
@@ -67,7 +69,7 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     promptVersion: PROMPT_VERSION,
   });
 
-  const result = await generatePremortemRisks({ model: template.model, system: template.system, user: userPrompt });
+  const result = await generatePremortemRisks({ model: template.model, system: systemPrompt, user: userPrompt });
   if (!result.ok) {
     trace.end({ error: result.error });
     return { ok: false, errors: [result.error] };
