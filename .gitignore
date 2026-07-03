@@ -10,6 +10,8 @@ goldset/*.json
 !goldset/example-001.json
 docs/eval/detail/
 .vscode/
+test-results/
+playwright-report/
 !.claude
 !.claude/**
 .claude/settings.local.json
