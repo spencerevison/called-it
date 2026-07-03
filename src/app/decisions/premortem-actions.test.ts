@@ -154,6 +154,27 @@ describe("generatePremortem", () => {
     expect(premortemDeleteEq).toHaveBeenCalledWith("id", "pm1");
   });
 
+  it("aborts if the decision left draft while the model was generating", async () => {
+    // first fetch: still a draft (passes the gate), second fetch after the LLM
+    // call: already committed -> must refuse without inserting anything
+    decisionFetchSingle
+      .mockResolvedValueOnce({ data: draftDecision(), error: null })
+      .mockResolvedValueOnce({ data: { user_id: "u1", status: "active" }, error: null });
+    generatePremortemRisks.mockResolvedValue({
+      ok: true,
+      risks: [{ description: "r", category: "execution", severity: "medium", likelihood: 0.3 }],
+    });
+
+    const { generatePremortem } = await import("./premortem-actions");
+    const result = await generatePremortem("d1");
+
+    expect(result).toEqual({
+      ok: false,
+      errors: ["Pre-mortems can only be generated while the decision is a draft."],
+    });
+    expect(premortemInsertSingle).not.toHaveBeenCalled();
+  });
+
   it("persists the premortem and risks on success", async () => {
     decisionFetchSingle.mockResolvedValue({ data: draftDecision(), error: null });
     const risks = Array.from({ length: 6 }, (_, i) => ({

@@ -76,6 +76,22 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
   }
   trace.end({ riskCount: result.risks.length });
 
+  // Re-check the draft gate: the LLM call above takes seconds, and the decision
+  // could have been committed (draft->active) in the meantime. Writing risks onto
+  // an active decision would desync the hashed judge input. See DATA_MODEL rule 1.
+  const { data: recheck } = await service
+    .from("decisions")
+    .select("user_id, status")
+    .eq("id", decisionId)
+    .single();
+
+  if (!recheck || recheck.user_id !== user.id) {
+    return { ok: false, errors: ["Decision not found."] };
+  }
+  if (recheck.status !== "draft") {
+    return { ok: false, errors: ["Pre-mortems can only be generated while the decision is a draft."] };
+  }
+
   const { data: premortem, error: insertError } = await service
     .from("premortems")
     .insert({
