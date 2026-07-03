@@ -25,7 +25,8 @@ export async function scheduleCheckinReminders(decisionId: string): Promise<void
 
     for (const row of rows) {
       const handle = await checkinReminder.trigger({ checkinId: row.id, scheduledFor: row.scheduled_for });
-      await service.from("checkins").update({ trigger_run_id: handle.id }).eq("id", row.id);
+      const { error: runIdError } = await service.from("checkins").update({ trigger_run_id: handle.id }).eq("id", row.id);
+      if (runIdError) console.error("failed to record trigger_run_id for checkin", row.id, runIdError);
     }
   } catch (err) {
     console.error("scheduleCheckinReminders failed", err);
