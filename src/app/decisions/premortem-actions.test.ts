@@ -10,6 +10,8 @@ const forecastsSelect = vi.fn();
 const premortemInsertSingle = vi.fn();
 const risksInsert = vi.fn();
 const premortemDeleteEq = vi.fn();
+const premortemFetchSingle = vi.fn();
+const userRiskInsertSingle = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(() => ({
@@ -22,11 +24,18 @@ vi.mock("@/lib/supabase/service", () => ({
       }
       if (table === "premortems") {
         return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ single: premortemFetchSingle })) })),
           insert: vi.fn(() => ({ select: vi.fn(() => ({ single: premortemInsertSingle })) })),
           delete: vi.fn(() => ({ eq: premortemDeleteEq })),
         };
       }
-      return { insert: risksInsert };
+      return {
+        insert: vi.fn((arg) => {
+          if (Array.isArray(arg)) return risksInsert(arg);
+          risksInsert(arg);
+          return { select: vi.fn(() => ({ single: userRiskInsertSingle })) };
+        }),
+      };
     }),
   })),
 }));
@@ -35,7 +44,11 @@ const hasAnthropicKey = vi.fn(() => true);
 vi.mock("@/lib/llm/client", () => ({ hasAnthropicKey }));
 
 const generatePremortemRisks = vi.fn();
-vi.mock("@/lib/llm/premortem", () => ({ generatePremortemRisks }));
+vi.mock("@/lib/llm/premortem", () => ({
+  generatePremortemRisks,
+  RISK_CATEGORIES: ["execution", "external", "information", "motivated_reasoning", "second_order"],
+  RISK_SEVERITIES: ["low", "medium", "high"],
+}));
 
 vi.mock("@/lib/prompts/template", () => ({
   loadPromptTemplate: vi.fn(async () => ({
@@ -204,5 +217,82 @@ describe("generatePremortem", () => {
         source: "ai",
       })),
     );
+  });
+});
+
+function riskFormData(overrides: Partial<Record<string, string>> = {}) {
+  const data = new FormData();
+  const fields = { description: "Vendor could go dark mid-project", category: "external", severity: "high", ...overrides };
+  for (const [key, value] of Object.entries(fields)) data.set(key, value);
+  return data;
+}
+
+describe("addUserRisk", () => {
+  beforeEach(() => {
+    getUser.mockReset();
+    premortemFetchSingle.mockReset();
+    decisionFetchSingle.mockReset();
+    risksInsert.mockReset();
+    userRiskInsertSingle.mockReset();
+
+    getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+  });
+
+  it("requires an authenticated user", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData());
+    expect(result).toEqual({ ok: false, errors: ["Not signed in."] });
+  });
+
+  it("rejects invalid fields before touching the database", async () => {
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData({ description: "", category: "bogus", severity: "bogus" }));
+    expect(result.ok).toBe(false);
+    expect(premortemFetchSingle).not.toHaveBeenCalled();
+  });
+
+  it("rejects a premortem not owned by the caller (IDOR)", async () => {
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "other", decision_id: "d1" }, error: null });
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData());
+    expect(result).toEqual({ ok: false, errors: ["Pre-mortem not found."] });
+    expect(decisionFetchSingle).not.toHaveBeenCalled();
+    expect(risksInsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a nonexistent premortem", async () => {
+    premortemFetchSingle.mockResolvedValue({ data: null, error: { message: "no rows" } });
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData());
+    expect(result).toEqual({ ok: false, errors: ["Pre-mortem not found."] });
+  });
+
+  it("rejects once the parent decision is no longer a draft", async () => {
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1" }, error: null });
+    decisionFetchSingle.mockResolvedValue({ data: { status: "active" }, error: null });
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData());
+    expect(result).toEqual({ ok: false, errors: ["Risks can only be added while the decision is a draft."] });
+    expect(risksInsert).not.toHaveBeenCalled();
+  });
+
+  it("persists a user risk on a draft decision", async () => {
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1" }, error: null });
+    decisionFetchSingle.mockResolvedValue({ data: { status: "draft" }, error: null });
+    userRiskInsertSingle.mockResolvedValue({ data: { id: "risk1" }, error: null });
+
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData());
+
+    expect(result).toEqual({ ok: true, id: "risk1" });
+    expect(risksInsert).toHaveBeenCalledWith({
+      user_id: "u1",
+      premortem_id: "pm1",
+      description: "Vendor could go dark mid-project",
+      category: "external",
+      severity: "high",
+      source: "user",
+    });
   });
 });

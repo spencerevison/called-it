@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DecisionForm } from "@/app/decisions/decision-form";
 import { ForecastList } from "@/app/decisions/forecast-list";
+import { PremortemPanel, type Risk } from "@/app/decisions/premortem-panel";
 
 export default async function EditDecisionPage({
   params,
@@ -31,6 +32,24 @@ export default async function EditDecisionPage({
     .eq("decision_id", decision.id)
     .order("created_at", { ascending: true });
 
+  // a decision can have multiple premortems (each "regenerate" inserts a new row) —
+  // only the most recent one is live; older rows are inert history
+  const { data: latestPremortem } = await supabase
+    .from("premortems")
+    .select("id")
+    .eq("decision_id", decision.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: risks } = latestPremortem
+    ? await supabase
+        .from("premortem_risks")
+        .select("id, description, category, severity, source")
+        .eq("premortem_id", latestPremortem.id)
+        .order("created_at", { ascending: true })
+    : { data: [] };
+
   return (
     <main className="mx-auto max-w-xl px-4 py-8 space-y-10">
       <div>
@@ -51,6 +70,14 @@ export default async function EditDecisionPage({
       </div>
 
       <ForecastList decisionId={decision.id} forecasts={forecasts ?? []} />
+
+      {/* this page only renders for status === "draft" (see notFound above) */}
+      <PremortemPanel
+        decisionId={decision.id}
+        premortemId={latestPremortem?.id ?? null}
+        risks={(risks ?? []) as Risk[]}
+        isDraft={true}
+      />
     </main>
   );
 }

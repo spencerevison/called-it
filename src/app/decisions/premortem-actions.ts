@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { hasAnthropicKey } from "@/lib/llm/client";
-import { generatePremortemRisks } from "@/lib/llm/premortem";
+import { generatePremortemRisks, RISK_CATEGORIES, RISK_SEVERITIES, type RiskCategory, type RiskSeverity } from "@/lib/llm/premortem";
 import { loadPromptTemplate, renderTemplate } from "@/lib/prompts/template";
 import { startTrace } from "@/lib/llm/tracing";
 
@@ -127,4 +127,81 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
   }
 
   return { ok: true, id: premortem.id };
+}
+
+export type AddUserRiskResult = { ok: true; id: string } | { ok: false; errors: string[] };
+
+function parseUserRiskFields(formData: FormData): {
+  fields: { description: string; category: RiskCategory; severity: RiskSeverity } | null;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  const description = String(formData.get("description") ?? "").trim();
+  if (!description) errors.push("Description is required.");
+
+  const category = String(formData.get("category") ?? "");
+  if (!RISK_CATEGORIES.includes(category as RiskCategory)) errors.push("A valid category is required.");
+
+  const severity = String(formData.get("severity") ?? "");
+  if (!RISK_SEVERITIES.includes(severity as RiskSeverity)) errors.push("A valid severity is required.");
+
+  if (errors.length > 0) return { fields: null, errors };
+  return {
+    fields: { description, category: category as RiskCategory, severity: severity as RiskSeverity },
+    errors: [],
+  };
+}
+
+// risks are judge input (DATA_MODEL integrity rule 1) — user-added risks only writable while
+// the parent decision is a draft; ownership is checked via the premortem row, not the decision
+// row, since a premortem_id doesn't imply the caller owns it (historical IDOR — docs/EVIDENCE.md)
+export async function addUserRisk(premortemId: string, formData: FormData): Promise<AddUserRiskResult> {
+  const { fields, errors } = parseUserRiskFields(formData);
+  if (!fields) return { ok: false, errors };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, errors: ["Not signed in."] };
+
+  const service = createServiceClient();
+  const { data: premortem, error: premortemError } = await service
+    .from("premortems")
+    .select("user_id, decision_id")
+    .eq("id", premortemId)
+    .single();
+
+  if (premortemError || !premortem || premortem.user_id !== user.id) {
+    return { ok: false, errors: ["Pre-mortem not found."] };
+  }
+
+  const { data: decision, error: decisionError } = await service
+    .from("decisions")
+    .select("status")
+    .eq("id", premortem.decision_id)
+    .single();
+
+  if (decisionError || !decision || decision.status !== "draft") {
+    return { ok: false, errors: ["Risks can only be added while the decision is a draft."] };
+  }
+
+  const { data, error } = await service
+    .from("premortem_risks")
+    .insert({
+      user_id: user.id,
+      premortem_id: premortemId,
+      description: fields.description,
+      category: fields.category,
+      severity: fields.severity,
+      source: "user" as const,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, errors: [error?.message ?? "Failed to save risk."] };
+  }
+  return { ok: true, id: data.id };
 }

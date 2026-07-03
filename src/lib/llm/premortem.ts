@@ -1,7 +1,9 @@
 import { generateText } from "./client";
 
-const CATEGORIES = ["execution", "external", "information", "motivated_reasoning", "second_order"] as const;
-const SEVERITIES = ["low", "medium", "high"] as const;
+export const RISK_CATEGORIES = ["execution", "external", "information", "motivated_reasoning", "second_order"] as const;
+export const RISK_SEVERITIES = ["low", "medium", "high"] as const;
+const CATEGORIES = RISK_CATEGORIES;
+const SEVERITIES = RISK_SEVERITIES;
 
 export type RiskCategory = (typeof CATEGORIES)[number];
 export type RiskSeverity = (typeof SEVERITIES)[number];
