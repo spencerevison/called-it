@@ -13,7 +13,7 @@ Single source of truth for how the build loop behaves. `loop/TASKS.md` says what
 | Author | `claude-sonnet-5` | writes one task, TDD, commits on `loop/work` |
 | Reviewer | `claude-fable-5` | adversarial, **read-only**, separate pass over the last commit |
 | Fixer | `claude-sonnet-5` | applies the reviewer's written prescription |
-| Escalated fixer | `claude-opus-4-8` | only after `N=2` failed Sonnet-fix / Fable-review cycles |
+| Escalated fixer | `claude-opus-4-8` | only after `N=3` failed Sonnet-fix / Fable-review cycles |
 | Escalation-debugger | `claude-fable-5` | red-gate diagnosis during authoring (distinct from the reviewer) |
 
 Fable 5 retires ~2026-07-07; when it does, Reviewer → `claude-opus-4-8` (set `REVIEWER_MODEL` in `loop.sh`). Author and fixer must not be the same tier as the reviewer, or review becomes self-grading — that's why the fixer defaults to Sonnet and only escalates to Opus when a prescribed fix repeatedly fails (signal that the fix itself needs judgment).
@@ -32,7 +32,7 @@ Every task in `loop/TASKS.md` carries one tag. The runner gates review off the t
 
 ## Escalation cap
 
-Per flagged commit: Sonnet fixer → Fable re-review, up to **N=2** cycles. If still flagged after the 2nd cycle, the fixer escalates to `claude-opus-4-8` for one more cycle. Still flagged after that → HALT.
+Per flagged commit: Sonnet fixer → Fable re-review, up to **N=3** cycles. If still flagged after the 3rd cycle, the fixer escalates to `claude-opus-4-8` for one more cycle. Still flagged after that → HALT. (A deep task can surface a *different* genuine finding each cycle — severity trending down is the signal it's converging, not stuck; the raised cap gives it room to finish before halting for a human.)
 
 ## HALT taxonomy (stop, checkpoint on `loop/work`, wait for a human)
 
