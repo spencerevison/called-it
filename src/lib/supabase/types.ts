@@ -529,7 +529,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      commit_decision: {
+        Args: {
+          p_decision_id: string
+          p_six_months: string
+          p_two_months: string
+          p_two_weeks: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       attribution: "skill" | "luck" | "mixed"

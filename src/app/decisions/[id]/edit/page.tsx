@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DecisionForm } from "@/app/decisions/decision-form";
 import { ForecastList } from "@/app/decisions/forecast-list";
 import { PremortemPanel, type Risk } from "@/app/decisions/premortem-panel";
+import { CommitPanel } from "@/app/decisions/commit-panel";
 
 export default async function EditDecisionPage({
   params,
@@ -78,6 +79,8 @@ export default async function EditDecisionPage({
         risks={(risks ?? []) as Risk[]}
         isDraft={true}
       />
+
+      <CommitPanel decisionId={decision.id} />
     </main>
   );
 }
