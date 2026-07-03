@@ -1,92 +1,194 @@
 #!/usr/bin/env bash
-# Ralph loop for the called-it build.
-# Run from the repo root (the directory containing SPEC.md and loop/). Use tmux.
-# Stop anytime: `touch .loop-stop`.
+# called-it build loop — author -> review -> fix, with model-role separation.
+# Run from repo root (dir with SPEC.md + loop/). Use tmux. Stop anytime: touch .loop-stop
 #
-# Env knobs:
-#   MODEL       — default claude-sonnet-5 (fallback: claude-sonnet-4-6 if day-two weirdness)
-#   EFFORT      — default medium (loop work is specced + gated; escalation handles hard cases)
-#   MAX_ITER    — default 25. This is also the budget ceiling: on a plan there is no $ meter,
-#                 so size MAX_ITER from calibration %/iteration and check bars between runs.
-#   MAX_TURNS   — per-iteration agent turn cap, default 60
-#   STALL_LIMIT — consecutive no-progress iterations tolerated, default 2
-#
-# Stop conditions, in checking order:
-#   .loop-stop file · no eligible tasks · dirty tree at iteration start (prior crash)
-#   · red gates after a claimed-progress iteration (shell verifies, not the model)
-#   · STALL_LIMIT consecutive no-progress iterations · MAX_ITER
+# Design (full rationale in CLAUDE.md):
+#   - Author (Sonnet) does one task on a scratch branch (loop/work), commits, stops.
+#   - Runner verifies the gate itself (ground truth), then gates review off the task's risk tag.
+#   - risk:high -> adversarial Fable review as a SEPARATE pass over the diff.
+#       pass -> ff-merge main + tag + push. flag -> fixer cycle (Sonnet, N=2, then Opus).
+#       high-sev flag on an auth/DB path, or unclearable flag -> HALT for a human.
+#   - risk:low / risk:math -> no review; gate + merge (vectors are the check for math).
+#   - Phase-boundary tasks trigger a cumulative quality review (Fable).
+#   - Atomic: a crash/turn-kill leaves main untouched; loop/work is force-discarded next iter.
 set -uo pipefail
 
-MODEL="${MODEL:-claude-sonnet-5}"
+AUTHOR_MODEL="${AUTHOR_MODEL:-claude-sonnet-5}"
+REVIEWER_MODEL="${REVIEWER_MODEL:-claude-fable-5}"   # -> claude-opus-4-8 once Fable retires
+FIXER_MODEL="${FIXER_MODEL:-claude-sonnet-5}"
+ESCALATED_FIXER_MODEL="${ESCALATED_FIXER_MODEL:-claude-opus-4-8}"
 EFFORT="${EFFORT:-medium}"
-MAX_ITER="${MAX_ITER:-25}"
-MAX_TURNS="${MAX_TURNS:-60}"
+MAX_ITER="${MAX_ITER:-40}"
+MAX_TURNS="${MAX_TURNS:-100}"      # author/fixer
+REVIEW_TURNS="${REVIEW_TURNS:-60}"
+FIX_CAP="${FIX_CAP:-2}"            # Sonnet fix/review cycles before Opus
 STALL_LIMIT="${STALL_LIMIT:-2}"
-export CLAUDE_CODE_EFFORT_LEVEL="$EFFORT"
+PUSH="${PUSH:-1}"
+WORK="${WORK:-loop/work}"
+
+# auth/DB access-control tasks: a high-severity flag here HALTs, never auto-fixes (CLAUDE.md).
+HALT_TASKS=" T11 T21 T25 "
+# phase-boundary tasks: completing one triggers a cumulative quality review.
+QG_TASKS=" T20 T28 T31 T36 T39 T44 "
 
 [[ -f SPEC.md && -f loop/PROMPT.md ]] || { echo "Run from repo root (SPEC.md + loop/ expected)."; exit 1; }
+export CLAUDE_CODE_EFFORT_LEVEL="$EFFORT"
 
 log() { echo "[loop] $*" | tee -a loop/loop.log; }
+ts()  { date "+%Y-%m-%dT%H:%M:%S%z"; }
 
-progress_sig() {
-  # HEAD + checked-task count + blocked-task count. If none of these moved, nothing happened.
-  local head checked blocked
-  head=$(git rev-parse HEAD 2>/dev/null || echo "no-git")
-  checked=$(grep -c '^- \[x\]' loop/TASKS.md || true)
-  blocked=$(grep -c '\[BLOCKED' loop/TASKS.md || true)
-  echo "${head}:${checked}:${blocked}"
+run_agent() { # <model> <prompt> ; author/fixer, full tools
+  local model="$1" prompt="$2"
+  claude -p "$prompt" --model "$model" --max-turns "$MAX_TURNS" \
+    --dangerously-skip-permissions 2>&1 | tee -a loop/loop.log
+}
+
+reset_work() { # discard any residue, fork a clean loop/work from main
+  git checkout -f main >/dev/null 2>&1
+  git branch -D "$WORK" >/dev/null 2>&1 || true
+  if [[ -n "$(git status --porcelain)" ]]; then
+    log "STOP: main dirty after force-reset (untracked/uncommitted non-ignored files). Human needed."
+    exit 2
+  fi
+  git checkout -q -b "$WORK"
+}
+
+gate_ok() { # runner's own ground-truth check; skipped pre-T01 (no package.json/check)
+  [[ -f package.json ]] && grep -q '"check"' package.json || return 0
+  pnpm check >> loop/loop.log 2>&1
+}
+
+review() { # <diff-range> <task-line> <mode: task|quality> -> writes loop/REVIEW.md, echoes VERDICT line
+  local range="$1" taskline="$2" mode="$3" diff prompt out
+  diff="$(git diff "$range")"
+  prompt="$(cat .claude/agents/reviewer.md)
+
+You are reviewing in **${mode}** mode. Task context (from loop/TASKS.md):
+${taskline}
+
+Diff under review (${range}):
+\`\`\`diff
+${diff}
+\`\`\`
+Read any files you need for context. End with exactly one VERDICT line."
+  out="$(CLAUDE_CODE_EFFORT_LEVEL=high claude -p "$prompt" --model "$REVIEWER_MODEL" \
+        --max-turns "$REVIEW_TURNS" --dangerously-skip-permissions \
+        --allowedTools "Read Grep Glob" 2>&1)"
+  printf '%s\n' "$out" > loop/REVIEW.md
+  { echo "--- review ($mode) ${range} $(ts) ---"; printf '%s\n' "$out"; } >> loop/loop.log
+  printf '%s\n' "$out" | grep -E '^VERDICT:' | tail -1
+}
+
+phase_of() { case "$1" in T20) echo P2;; T28) echo P3;; T31) echo P4;; T36) echo P5;; T39) echo P6;; T44) echo P7;; *) echo P?;; esac; }
+
+halt() { # <tag> <reason>
+  local tag="$1" reason="$2"
+  log "HALT: $reason"
+  [[ -n "$tag" ]] && git tag -f "$tag" >/dev/null 2>&1
+  { echo; echo "## SUMMARY ($(ts))"; echo "HALT: $reason"; echo "Inspect: git status, branch $WORK, loop/REVIEW.md, loop/QUESTIONS.md."; } >> loop/PROGRESS.md
+  exit 5
+}
+
+merge_and_tag() { # <verdict> <task> ; ff main to work, tag, push. No stdout (callers read main after).
+  local verdict="$1" task="$2"
+  git checkout -q main
+  git merge --ff-only "$WORK" >> loop/loop.log 2>&1 || { log "STOP: ff-merge failed (main moved?)."; exit 6; }
+  [[ -n "$task" ]] && git tag -f "reviewed-${verdict}-${task}" >/dev/null 2>&1
+  if [[ "$PUSH" == 1 ]]; then
+    { git push -q origin main && git push -q -f origin --tags; } >>loop/loop.log 2>&1 \
+      || echo "[loop] warn: push failed (offline?)." >>loop/loop.log
+  fi
 }
 
 stalls=0
 for i in $(seq 1 "$MAX_ITER"); do
   [[ -f .loop-stop ]] && { log ".loop-stop found — exiting."; break; }
 
-  remaining=$(grep '^- \[ \]' loop/TASKS.md | grep -v '\[HAND\]' | grep -vc '\[BLOCKED' || true)
+  remaining=$(grep '^- \[ \]' loop/TASKS.md | grep -vc '\[BLOCKED' || true)
   if [[ "${remaining:-0}" -eq 0 ]]; then
-    log "No loop-eligible tasks remain (only [HAND]/[BLOCKED] left, or done)."
+    log "No eligible tasks remain (all checked or blocked)."
+    { echo; echo "## SUMMARY ($(ts))"; echo "All tasks checked or blocked."; } >> loop/PROGRESS.md
     break
   fi
 
-  # Dirty tree at iteration start = the previous iteration died mid-task.
-  # Do not let a fresh session improvise around a crash — stop for a human.
-  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
-    log "STOP: dirty working tree at iteration start (prior iteration crashed mid-task?)."
-    log "Inspect with git status/diff, commit or reset to green, then rerun."
-    exit 2
-  fi
+  main_before="$(git rev-parse main 2>/dev/null)"
+  reset_work
+  log "=== iter $i/$MAX_ITER — $remaining task(s) — author=$AUTHOR_MODEL @ $EFFORT — $(ts) ==="
 
-  before=$(progress_sig)
-  echo "=== [loop] iteration $i/$MAX_ITER — $remaining task(s) — $MODEL @ $EFFORT — $(date "+%Y-%m-%dT%H:%M:%S%z") ===" | tee -a loop/loop.log
-  claude -p "$(cat loop/PROMPT.md)" \
-    --model "$MODEL" \
-    --max-turns "$MAX_TURNS" \
-    --dangerously-skip-permissions \
-    2>&1 | tee -a loop/loop.log
-  after=$(progress_sig)
+  # --- AUTHOR -------------------------------------------------------------
+  run_agent "$AUTHOR_MODEL" "$(cat loop/PROMPT.md)"
 
-  # Ground truth beats self-report: if the agent claims progress, the SHELL verifies the gates.
-  # (Skipped until the repo has a package.json with a "check" script, i.e. pre-T01.)
-  if [[ "$after" != "$before" && -f package.json ]] && grep -q '"check"' package.json; then
-    if ! pnpm check >> loop/loop.log 2>&1; then
-      log "STOP: agent reported progress but 'pnpm check' is red — done() was lying."
-      log "Inspect the last commit(s); revert or fix before rerunning."
-      exit 3
-    fi
-  fi
-
-  if [[ "$after" == "$before" ]]; then
+  if [[ "$(git rev-parse "$WORK")" == "$main_before" ]]; then
     stalls=$((stalls + 1))
-    log "No progress this iteration ($stalls/$STALL_LIMIT)."
-    if [[ "$stalls" -ge "$STALL_LIMIT" ]]; then
-      log "STOP: $STALL_LIMIT consecutive no-progress iterations — stalled, not working."
-      log "See loop/QUESTIONS.md and the tail of loop/loop.log."
-      exit 4
-    fi
-  else
-    stalls=0
+    log "No commit this iteration ($stalls/$STALL_LIMIT)."
+    [[ "$stalls" -ge "$STALL_LIMIT" ]] && { log "STOP: $STALL_LIMIT consecutive no-progress iterations."; exit 4; }
+    continue
+  fi
+  stalls=0
+
+  # runner verifies the gate itself — author may have committed on a red gate
+  if ! gate_ok; then
+    halt "" "author committed but 'pnpm check' is red on $WORK — done() was lying. Inspect the last commit."
   fi
 
-  sleep 5
+  newline="$(git diff main.."$WORK" -- loop/TASKS.md | grep -E '^\+.*- \[x\] T[0-9]+' | head -1)"
+  task="$(printf '%s' "$newline" | grep -oE 'T[0-9]+' | head -1)"
+  risk="$(printf '%s' "$newline" | grep -oE 'risk:(high|low|math)' | head -1)"
+  taskline="$(printf '%s' "$newline" | sed 's/^+//')"
+  log "iter $i: task=${task:-none} risk=${risk:-n/a}"
+
+  verdict="pass"
+  # --- REVIEW (risk:high only) -------------------------------------------
+  if [[ "$risk" == "risk:high" ]]; then
+    cycle=0
+    while : ; do
+      vline="$(review "main..$WORK" "$taskline" task)"
+      log "review: ${vline:-<no verdict>}"
+      if printf '%s' "$vline" | grep -q 'VERDICT: pass'; then verdict="pass"; break; fi
+
+      sev="$(printf '%s' "$vline" | grep -oE 'severity=(low|medium|high)' | cut -d= -f2)"
+      # immediate HALT: high-sev on an auth/DB path — never auto-fix these
+      if [[ "$sev" == "high" && "$HALT_TASKS" == *" $task "* ]]; then
+        { echo; echo "### $task review HALT ($(ts))"; cat loop/REVIEW.md; } >> loop/QUESTIONS.md
+        halt "reviewed-HALT-$task" "high-severity finding on auth/DB path $task — stopping for human review."
+      fi
+
+      if [[ "$cycle" -ge $((FIX_CAP + 1)) ]]; then
+        { echo; echo "### $task unclearable flag ($(ts))"; cat loop/REVIEW.md; } >> loop/QUESTIONS.md
+        halt "reviewed-flag-$task" "reviewer flag on $task not cleared within escalation cap."
+      fi
+
+      # --- FIX ---
+      fixer="$FIXER_MODEL"; [[ "$cycle" -ge "$FIX_CAP" ]] && fixer="$ESCALATED_FIXER_MODEL"
+      cycle=$((cycle + 1))
+      log "fix cycle $cycle on $task (fixer=$fixer)"
+      run_agent "$fixer" "$(cat loop/FIX.md)"
+      if ! gate_ok; then halt "reviewed-flag-$task" "fixer left $task with a red gate."; fi
+    done
+  fi
+
+  # --- MERGE --------------------------------------------------------------
+  merge_and_tag "$verdict" "$task"
+  log "merged $task ($verdict) -> main @ $(git rev-parse --short main)"
+
+  # --- QUALITY GATE (phase boundary) -------------------------------------
+  if [[ -n "$task" && "$QG_TASKS" == *" $task "* ]]; then
+    ph="$(phase_of "$task")"
+    base="$(git tag -l 'qg-pass-*' --sort=creatordate | tail -1)"
+    [[ -z "$base" ]] && base="$(git rev-list --max-parents=0 HEAD | tail -1)"
+    log "quality gate $ph: reviewing ${base}..main"
+    vline="$(review "${base}..main" "QUALITY GATE $ph (cumulative diff since $base)" quality)"
+    log "quality gate $ph: ${vline:-<no verdict>}"
+    if printf '%s' "$vline" | grep -q 'VERDICT: pass'; then
+      git tag -f "qg-pass-$ph" >/dev/null 2>&1
+      [[ "$PUSH" == 1 ]] && git push -q -f origin --tags 2>>loop/loop.log
+    else
+      { echo; echo "### quality gate $ph flag ($(ts))"; cat loop/REVIEW.md; } >> loop/QUESTIONS.md
+      halt "qg-flag-$ph" "quality gate $ph flagged cross-cutting drift — human review."
+    fi
+  fi
+
+  sleep 3
 done
 
-log "Done. Review loop/PROGRESS.md and loop/QUESTIONS.md, then git log."
+log "Done. Review loop/PROGRESS.md, loop/QUESTIONS.md, git tag -l, git log."

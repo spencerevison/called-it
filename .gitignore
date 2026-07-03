@@ -2,7 +2,8 @@ node_modules/
 .next/
 .env
 .env*.local
-loop/loop.log
+loop/loop*.log
+loop/REVIEW.md
 .loop-stop
 goldset/*.json
 !goldset/example-001.json
@@ -11,3 +12,4 @@ docs/eval/detail/
 !.claude
 !.claude/**
 .claude/settings.local.json
+!CLAUDE.md

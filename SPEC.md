@@ -125,7 +125,7 @@ Rationale in one line: maximally overlapping with NSI-portal so every architectu
 
 ### Interview-defensibility constraint (carries the NSI pattern forward)
 
-Three tasks are tagged `[HAND]` in `loop/TASKS.md` — Brier + rolling Brier, calibration-curve binning, pre-mortem surface rate. The loop authors their test suites from `METRICS.md` vectors and their type signatures, then skips implementation. Spence hand-writes these ~3 functions. They are the most interview-probed pure logic in the codebase.
+Spence writes no app code by hand; the loop authors everything. Defensibility therefore rests on the **harness**, not on a few hand-written functions: an adversarial reviewer (a different model tier than the author) reviews every `risk:high` diff, and that generator↔evaluator separation earns its keep on real bugs. The worked proof is the prior build's open-redirect fix — the loop shipped a flawed guard (a naive prefix check that let `/\evil.com` through) green through the `pnpm check` gate; catching exactly that class is the reviewer's job (see `docs/EVIDENCE.md`). The eval harness (`EVAL_PLAN.md`, `JUDGE_RUBRIC.md`) is the same discipline at a second scale — tuning an evaluator against ground truth. The interview-probed pure logic (Brier, calibration binning, surface rate) goes through the loop like any other `risk:math` task; its `METRICS.md` test vectors are the correctness anchor, hand-verified by Spence before the loop builds against them.
 
 ## 9. Success Metrics
 
@@ -134,7 +134,7 @@ Three tasks are tagged `[HAND]` in `loop/TASKS.md` — Brier + rolling Brier, ca
 
 ## 10. Phasing
 
-Maps 1:1 to `loop/TASKS.md`: P0 scaffold → P1 data model → P2 metrics lib (TDD; contains the `[HAND]` trio) → P3 core flows → P4 scheduling → P5 check-in → P6 judge → P7 eval harness → P8 dashboard → P9 ship. Phases P0–P2 are the highest-confidence unattended-loop territory (pure logic, hard gates). P3–P5 benefit from checkpoint review of UX. Gold-set labeling (Spence, ~10–15 min/decision × 20–30) runs in parallel and blocks only P7's *real* eval runs — fixtures unblock the harness build itself.
+Maps 1:1 to `loop/TASKS.md`: P0 scaffold → P1 data model → P2 metrics lib (TDD; the `METRICS.md` vectors are the gate) → P3 core flows → P4 scheduling → P5 check-in → P6 judge → P7 eval harness → P8 dashboard → P9 ship. Phases P0–P2 are the highest-confidence unattended-loop territory (pure logic, hard gates). P3–P5 benefit from checkpoint review of UX. Gold-set labeling (Spence, ~10–15 min/decision × 20–30) runs in parallel and blocks only P7's *real* eval runs — fixtures unblock the harness build itself.
 
 ## 11. Risks
 
@@ -142,7 +142,7 @@ Maps 1:1 to `loop/TASKS.md`: P0 scaffold → P1 data model → P2 metrics lib (T
 - **Trigger.dev long-wait limits or platform quirks** → reconciliation cron already makes the DB authoritative; worst case, waits degrade to cron-only (ADR-1 option B) with zero data-model change.
 - **Scope creep toward "AI decision coach"** → Non-goal #2 is load-bearing. Any generative advice feature is out.
 - **Gold-set labeling stalls** → decoupled by design; also it's the single highest-value hour of Spence-time in the project — treat it like the interview prep it secretly is (each labeled decision is a STAR-story quarry).
-- **Loop-built code Spence can't defend** → `[HAND]` trio + checkpoint audits (Fable reviews diffs against this spec at phase boundaries).
+- **Loop-built code Spence can't defend** → risk-gated adversarial review (Fable reviews every `risk:high` diff), phase-boundary quality gates, and the reviewer's proof-of-catch on real vulnerabilities (`docs/EVIDENCE.md`).
 
 ## 12. Open Questions
 
