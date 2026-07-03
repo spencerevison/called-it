@@ -103,6 +103,8 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
   );
 
   if (risksError) {
+    // no transaction available, so compensate manually to avoid an orphaned empty premortem
+    await service.from("premortems").delete().eq("id", premortem.id);
     return { ok: false, errors: [risksError.message] };
   }
 

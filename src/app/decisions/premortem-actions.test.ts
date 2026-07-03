@@ -9,6 +9,7 @@ const decisionFetchSingle = vi.fn();
 const forecastsSelect = vi.fn();
 const premortemInsertSingle = vi.fn();
 const risksInsert = vi.fn();
+const premortemDeleteEq = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(() => ({
@@ -20,7 +21,10 @@ vi.mock("@/lib/supabase/service", () => ({
         return { select: vi.fn(() => ({ eq: vi.fn(() => ({ order: forecastsSelect })) })) };
       }
       if (table === "premortems") {
-        return { insert: vi.fn(() => ({ select: vi.fn(() => ({ single: premortemInsertSingle })) })) };
+        return {
+          insert: vi.fn(() => ({ select: vi.fn(() => ({ single: premortemInsertSingle })) })),
+          delete: vi.fn(() => ({ eq: premortemDeleteEq })),
+        };
       }
       return { insert: risksInsert };
     }),
@@ -63,12 +67,14 @@ describe("generatePremortem", () => {
     forecastsSelect.mockReset();
     premortemInsertSingle.mockReset();
     risksInsert.mockReset();
+    premortemDeleteEq.mockReset();
     generatePremortemRisks.mockReset();
     hasAnthropicKey.mockReturnValue(true);
 
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     forecastsSelect.mockResolvedValue({ data: [] });
     risksInsert.mockResolvedValue({ error: null });
+    premortemDeleteEq.mockResolvedValue({ error: null });
   });
 
   it("requires an authenticated user", async () => {
@@ -121,6 +127,25 @@ describe("generatePremortem", () => {
     const result = await generatePremortem("d1");
     expect(result).toEqual({ ok: false, errors: ["Model response was not valid JSON."] });
     expect(premortemInsertSingle).not.toHaveBeenCalled();
+  });
+
+  it("deletes the orphaned premortem row when the risks insert fails", async () => {
+    decisionFetchSingle.mockResolvedValue({ data: draftDecision(), error: null });
+    const risks = Array.from({ length: 6 }, (_, i) => ({
+      description: `risk ${i}`,
+      category: "execution",
+      severity: "medium",
+      likelihood: 0.3,
+    }));
+    generatePremortemRisks.mockResolvedValue({ ok: true, risks });
+    premortemInsertSingle.mockResolvedValue({ data: { id: "pm1" }, error: null });
+    risksInsert.mockResolvedValue({ error: { message: "insert failed" } });
+
+    const { generatePremortem } = await import("./premortem-actions");
+    const result = await generatePremortem("d1");
+
+    expect(result).toEqual({ ok: false, errors: ["insert failed"] });
+    expect(premortemDeleteEq).toHaveBeenCalledWith("id", "pm1");
   });
 
   it("persists the premortem and risks on success", async () => {
