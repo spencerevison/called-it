@@ -16,7 +16,7 @@ Single source of truth for how the build loop behaves. `loop/TASKS.md` says what
 | Escalated fixer | `claude-opus-4-8` | only after `N=2` failed Sonnet-fix / Fable-review cycles |
 | Escalation-debugger | `claude-fable-5` | red-gate diagnosis during authoring (distinct from the reviewer) |
 
-Fable 5 retires ~5 days out; when it does, Reviewer → `claude-opus-4-8` (set `REVIEWER_MODEL` in `loop.sh`). Author and fixer must not be the same tier as the reviewer, or review becomes self-grading — that's why the fixer defaults to Sonnet and only escalates to Opus when a prescribed fix repeatedly fails (signal that the fix itself needs judgment).
+Fable 5 retires ~2026-07-07; when it does, Reviewer → `claude-opus-4-8` (set `REVIEWER_MODEL` in `loop.sh`). Author and fixer must not be the same tier as the reviewer, or review becomes self-grading — that's why the fixer defaults to Sonnet and only escalates to Opus when a prescribed fix repeatedly fails (signal that the fix itself needs judgment).
 
 ## Risk tags → review action (deterministic, by tag — not per-run judgment)
 
@@ -57,6 +57,16 @@ ponytail (lazy/YAGNI mode) is **on for author and fixer** — shortest working d
 ## Logging trigger (wider than ambiguity)
 
 Log to `loop/QUESTIONS.md` any **deviation from a literal spec instruction** — adapting to a newer API than the spec assumed, regenerating a generated file, a smallest-reasonable interpretation of an ambiguous AC, or any consequential judgment call — not only genuine ambiguity. The operator's audit depends on this surface being populated; the prior loop under-logged.
+
+## Running the loop
+
+The operator launches the loop in a terminal — Claude cannot (it spawns autonomous `claude -p --dangerously-skip-permissions` agents and needs the sandbox off; auto-mode blocks it). Claude's role is pre-flight, log/tag inspection, and harness debugging.
+
+```
+tmux new -s callit 'MAX_ITER=55 caffeinate -is bash loop/loop.sh'
+```
+
+`MAX_ITER` default is 40 but the backlog is ~47 tasks, so pass ~55 for a full run. `caffeinate -is` keeps the Mac awake (AC power); `touch .loop-stop` halts cleanly between iterations. First real checkpoints to watch: T11 (first `risk:high` review, a HALT path), the P2 quality gate after T20, and T29 (Trigger.dev, the fat watch-item).
 
 ## Commit style (inherited)
 
