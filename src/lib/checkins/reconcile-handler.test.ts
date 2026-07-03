@@ -54,11 +54,11 @@ describe("reconcileDueCheckins", () => {
     expect(result).toEqual({ updated: 0 });
   });
 
-  it("returns updated: 0 on a query error rather than throwing", async () => {
+  it("throws on a query error so Trigger.dev retries instead of a silent no-op", async () => {
     const { client } = buildClient({ error: true });
 
-    const result = await reconcileDueCheckins(client);
-
-    expect(result).toEqual({ updated: 0 });
+    await expect(reconcileDueCheckins(client)).rejects.toThrow(
+      "checkin reconcile failed: boom",
+    );
   });
 });

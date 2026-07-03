@@ -15,6 +15,6 @@ export async function reconcileDueCheckins(
     .lt("scheduled_for", new Date().toISOString())
     .select("id");
 
-  if (error) return { updated: 0 };
+  if (error) throw new Error(`checkin reconcile failed: ${error.message}`);
   return { updated: data?.length ?? 0 };
 }
