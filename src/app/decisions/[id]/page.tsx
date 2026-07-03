@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ForecastTimeline } from "./forecast-timeline";
 import { CheckinTimeline } from "./checkin-timeline";
 import { PremortemPanel, type Risk } from "@/app/decisions/premortem-panel";
+import { EventsPanel, type DecisionEvent } from "@/app/decisions/events-panel";
 
 export default async function DecisionDetailPage({
   params,
@@ -67,6 +68,12 @@ export default async function DecisionDetailPage({
     .eq("decision_id", decision.id)
     .order("scheduled_for", { ascending: true });
 
+  const { data: events } = await supabase
+    .from("decision_events")
+    .select("id, event_type, payload, created_at")
+    .eq("decision_id", decision.id)
+    .order("created_at", { ascending: false });
+
   return (
     <main className="mx-auto max-w-xl px-4 py-8 space-y-10">
       <div className="space-y-3">
@@ -103,6 +110,8 @@ export default async function DecisionDetailPage({
       />
 
       <CheckinTimeline checkins={checkins ?? []} />
+
+      <EventsPanel decisionId={decision.id} events={(events ?? []) as DecisionEvent[]} />
     </main>
   );
 }
