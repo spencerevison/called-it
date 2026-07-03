@@ -11,7 +11,7 @@ One task per loop iteration. Tags: `[risk:high|low|math]` = drives the review ga
 
 ## P1 · Data model (per DATA_MODEL.md — normative)
 
-- [ ] T05 [risk:low]: Migration: all enums + `profiles`. — AC: migration applies cleanly to a fresh local db.
+- [x] T05 [risk:low]: Migration: all enums + `profiles`. — AC: migration applies cleanly to a fresh local db.
 - [ ] T06 [risk:low]: Migration: `decisions`, `decision_events` + indexes. — AC: constraints from DATA_MODEL enforced (checked via a throwaway insert test).
 - [ ] T07 [risk:low]: Migration: `forecasts` (incl. `resolved_in_checkin_id`, `recalled_at`, `revealed_at`; no interval-headroom columns) + probability check constraint + indexes. — AC: p=0.005 insert rejected; the `resolved_in_checkin_id` FK is added later in T09 (forecasts precedes checkins).
 - [ ] T08 [risk:low]: Migration: `premortems`, `premortem_risks` (category CHECK-constrained to the five values) + indexes. — AC: cascade delete verified; `premortems.prompt_version` FK is added in T10 (premortems precedes prompt_versions).
