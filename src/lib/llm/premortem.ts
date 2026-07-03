@@ -63,20 +63,30 @@ export function parsePremortemResponse(raw: string): ParsedPremortemResponse {
   return { ok: true, risks: validated };
 }
 
-// retry-once-then-error per T24 AC: a malformed first response gets exactly
-// one corrective re-prompt before giving up
+// a thrown SDK error (429/529/network, or client.ts "no text block") maps to the
+// same {ok:false} contract the parse path returns — the server action must never reject
+async function callAndParse(params: { model: string; system: string; user: string }): Promise<ParsedPremortemResponse> {
+  let text: string;
+  try {
+    text = await generateText(params);
+  } catch (err) {
+    return { ok: false, error: `Model call failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  return parsePremortemResponse(text);
+}
+
+// retry-once-then-error per T24 AC: a bad first attempt (malformed response OR a
+// transport throw) gets exactly one corrective re-prompt before giving up
 export async function generatePremortemRisks(params: {
   model: string;
   system: string;
   user: string;
 }): Promise<ParsedPremortemResponse> {
-  const first = await generateText(params);
-  const firstParsed = parsePremortemResponse(first);
-  if (firstParsed.ok) return firstParsed;
+  const first = await callAndParse(params);
+  if (first.ok) return first;
 
-  const retry = await generateText({
+  return callAndParse({
     ...params,
-    user: `${params.user}\n\nYour previous response was invalid (${firstParsed.error}). Respond again with ONLY the strict JSON object described above.`,
+    user: `${params.user}\n\nYour previous response was invalid (${first.error}). Respond again with ONLY the strict JSON object described above.`,
   });
-  return parsePremortemResponse(retry);
 }

@@ -77,4 +77,8 @@ describe("generatePremortemRisks", () => {
     expect(result.ok).toBe(false);
     expect(generateText).toHaveBeenCalledTimes(2);
   });
+
+  // the transport-throw path (generateText rejects → ok:false) lives in
+  // premortem.transport.test.ts: vitest v4 surfaces errors thrown through a vi.fn
+  // spy even when caught, so that case uses a plain (non-spy) throwing mock.
 });
