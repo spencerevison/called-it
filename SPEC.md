@@ -88,9 +88,9 @@ Log decision (title, context, options, chosen, stakes, reversibility, rationale)
 
 ### P2 — Future considerations (design must not preclude)
 
-- Interval forecasts (schema already carries nullable bounds + type).
+- Interval forecasts (add nullable bounds + `forecast_type` — a trivial migration; kept out of v1 so the columns don't sit inert and distort the "all resolved forecasts" metric contracts).
 - Murphy decomposition of Brier (reliability/resolution/uncertainty).
-- Multi-user (RLS already enforces isolation).
+- Multi-user (RLS + server-action ownership checks isolate users; validated single-tenant, so multi-user ships only behind a cross-user isolation test pass).
 - Export (decisions are plain rows; no lock-in formats).
 
 ## 8. Architecture
@@ -99,13 +99,15 @@ Log decision (title, context, options, chosen, stakes, reversibility, rationale)
 
 **Version policy:** latest stable major for every dependency at install time; the loop verifies against current docs rather than trusting version numbers in this spec (which reflect its authoring date). Pins require a stated reason.
 
+**Write path:** all mutations to user tables go through server actions/route handlers (server-side Supabase client); the browser does not write user tables directly (DATA_MODEL integrity rule 0). Several invariants — the commit transaction, recall-before-reveal ordering, cross-decision lineage — cannot be expressed in RLS, so they live in the server action layer where they are testable; client RLS is select-oriented.
+
 Rationale in one line: maximally overlapping with NSI-portal so every architecture question in an interview lands on ground Spence already owns; the only new surface is Trigger.dev, which is itself demo material.
 
 ### ADR-1: Scheduling — Trigger.dev durable waits vs cron-polling only
 
 - **Options:** (A) Trigger.dev `wait.until` per check-in + daily reconciliation cron. (B) Vercel cron polling a `scheduled_for` index. (C) Inngest.
 - **Decision:** A. Durable multi-month waits are the demo's money shot (a visibly running 6-month task) and exercise a real production pattern (durable execution). B alone is simpler and is retained *inside* A as the reconciliation/healing layer — DB is always source of truth, tasks self-noop against it. C is equivalent to A with less familiarity.
-- **Consequences:** One external dependency and its dashboard to manage; failure mode (missed wake) is covered by the cron; task cancellation deferred to P1 because self-noop makes stale tasks harmless.
+- **Consequences:** One external dependency and its dashboard to manage; failure mode (missed wake) is covered by the cron; task cancellation deferred to P1 because self-noop makes stale tasks harmless. The self-noop predicate must be `status = 'pending' AND trigger_run_id = this run` (not status alone) — otherwise a rescheduled check-in's *old* task wakes, still sees `pending`, and marks the row due early; and resolve/abandon sets remaining check-ins to `skipped` (DATA_MODEL rule 5) so no live wait resurfaces a dead decision.
 
 ### ADR-2: Cloud LLM + encryption at rest vs local models
 

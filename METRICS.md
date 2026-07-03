@@ -2,7 +2,7 @@
 
 Every metric is a **pure function** in `src/lib/metrics/` operating on plain input arrays (no DB access). A separate aggregation service maps DB rows → these inputs. The test vectors below are normative: the loop writes the test suite from them **verbatim before any implementation** (T13). Tolerance: `±1e-9` unless noted.
 
-Conventions: `p` = recorded probability ∈ [0.01, 0.99]; `o` = outcome ∈ {0, 1}; only `resolved = true` forecasts enter any metric; display layer shows "insufficient data" below the stated minimum n rather than a number.
+Conventions: `p` = recorded probability ∈ [0.01, 0.99]; `o` = outcome ∈ {0, 1}; only `resolved = true` forecasts enter any metric; display layer shows "insufficient data" below the stated minimum n rather than a number. v1 forecasts are all binary (interval forecasts are P2 and not in the schema), so no `forecast_type` filter is needed anywhere.
 
 ---
 
@@ -30,6 +30,7 @@ Conventions: `p` = recorded probability ∈ [0.01, 0.99]; `o` = outcome ∈ {0, 
 **Inputs:** resolved forecasts having `recalled_probability` (`r`).
 **Definition:** per forecast, signed drift toward the outcome: `d = (r − p) · s` where `s = +1` if `o = 1`, `−1` if `o = 0`. `HB = mean(d)`. Range [−0.98, 0.98]. **HB > 0** = memory drifts toward "I knew it all along."
 **Min n:** 5.
+*Integrity depends on* the recorded `p` staying hidden for unresolved forecasts (T27) and `recalled_probability` being write-once before reveal (rule 2) — otherwise `r` measures memory-of-a-seen-value, not hindsight drift.
 
 **Vector:** `(p, r, o)`: `(0.6, 0.8, 1) → (0.8−0.6)·(+1) = +0.2`; `(0.3, 0.2, 0) → (0.2−0.3)·(−1) = +0.1`
 → `HB = 0.15`
@@ -60,13 +61,14 @@ Implementation note: do multiple-of checks on integer basis points (`Math.round(
 
 **Definition:** partition resolved forecasts by horizon `h = resolved_at − forecast created_at`: **short** ≤ 30 days, **long** > 90 days (31–90 excluded from this metric by design — it contrasts the ends). `gap = brier(long) − brier(short)`. **gap > 0** = worse at long horizons.
 **Min n:** 5 per side.
+*Interpretation caveat:* because forecasts resolve at check-ins (~14/60/180 days), `h` quantizes to check-in cadence — the metric partly reflects which check-in resolved a forecast, not purely when the outcome became knowable. The plain-language sentence should not overclaim precision.
 
 **Vector:** short `(p,o)`: `(0.8,1), (0.3,0)` → `(0.04 + 0.09)/2 = 0.065`; long: `(0.9,0), (0.6,1)` → `(0.81 + 0.16)/2 = 0.485`
 → `gap = +0.42`
 
 ## M7 · Options-considered count
 
-**Definition:** `mean(len(options_considered))` over **committed** decisions (draft entries excluded); plus trend by commit month. Interpretation anchor: chronic 1–2 = decisions framed as yes/no rather than choice sets.
+**Definition:** `mean(len(options_considered))` over **committed** decisions (`decided_at IS NOT NULL` — this excludes both drafts and abandoned-from-draft decisions); plus trend by commit month. Interpretation anchor: chronic 1–2 = decisions framed as yes/no rather than choice sets.
 
 **Vector:** counts `[2, 4, 3, 3] → 3.0`
 
@@ -78,7 +80,7 @@ Implementation note: do multiple-of checks on integer basis points (`Math.round(
 
 ## M9 · Luck/skill attribution pattern (self-serving index)
 
-**Inputs:** each completed check-in carries `overall_attribution` (skill/luck/mixed — a required field at completion, see DATA_MODEL) plus an outcome valence derived from its resolved forecasts: a check-in is **good** if the majority resolved in the desired direction (`o = 1` when `desired`, `o = 0` when not), **bad** otherwise; ties = bad (conservative). Failure-row attributions feed the detail view only.
+**Inputs:** each completed check-in carries `overall_attribution` (skill/luck/mixed — a required field at completion, see DATA_MODEL) plus an outcome valence derived from **its** resolved forecasts (the forecasts whose `resolved_in_checkin_id` = this check-in — that link is why the column exists): a check-in is **good** if the majority resolved in the desired direction (`o = 1` when `desired`, `o = 0` when not), **bad** otherwise; ties = bad (conservative). Failure-row attributions feed the detail view only.
 **Definition:** `SSI = P(overall_attribution = skill | good) − P(skill | bad)`. **SSI > 0** = self-serving (my wins are skill, my losses are luck). `mixed` counts as not-skill.
 **Min n:** 4 per side.
 
@@ -86,7 +88,7 @@ Implementation note: do multiple-of checks on integer basis points (`Math.round(
 
 ## M10 · Pre-mortem surface rate
 
-**Inputs:** resolved decisions with ≥ 1 check-in failure where `was_knowable = true`.
+**Inputs:** resolved decisions with ≥ 1 check-in failure where `was_knowable = true`. (A `linked_risk_id` is guaranteed to belong to the failure's own decision by integrity rule 4, so a "linked" failure always means the pre-mortem for *this* decision surfaced it.)
 **Definition (primary, per-failure):** `surfaceRate = |knowable failures with linked_risk_id ≠ null| / |knowable failures|`.
 **Companion (per-decision):** share of such decisions where ≥ 1 knowable failure was linked.
 Unknowable failures (`was_knowable = false`) are excluded — the pre-mortem is only accountable for the knowable.

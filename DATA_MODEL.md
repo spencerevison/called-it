@@ -64,11 +64,11 @@ create table forecasts (
   -- resolution (set at check-in)
   resolved boolean not null default false,
   outcome boolean,                          -- null until resolved
-  recalled_probability numeric(4,3),        -- captured BEFORE recorded value is revealed
+  resolved_in_checkin_id uuid,              -- which check-in resolved it; M9 valence source. Set when the forecast is resolved. FK to checkins(id) added in the checkins migration (T09) — forecasts precedes checkins (kept as a comment, not inline, so T07 applies cleanly).
+  recalled_probability numeric(4,3),        -- captured BEFORE recorded value is revealed; write-once
+  recalled_at timestamptz,                  -- when recall was captured
+  revealed_at timestamptz,                  -- when the recorded value was first shown; recall writable only while null
   resolved_at timestamptz,
-  -- P2 headroom: interval forecasts
-  forecast_type text not null default 'binary',
-  lower_bound numeric, upper_bound numeric,
   created_at timestamptz not null default now(),
   check (resolved = false or outcome is not null)
 );
@@ -77,7 +77,7 @@ create table premortems (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id),
   decision_id uuid not null references decisions(id) on delete cascade,
-  prompt_version text not null,             -- e.g. 'premortem_v1'
+  prompt_version text not null,             -- e.g. 'premortem_v1'; FK to prompt_versions(id) added in the prompt_versions migration (premortems precedes it)
   model text not null,
   langfuse_trace_id text,
   created_at timestamptz not null default now()
@@ -89,7 +89,7 @@ create table premortem_risks (
   user_id uuid not null references auth.users(id),
   premortem_id uuid not null references premortems(id) on delete cascade,
   description text not null,
-  category text not null,                   -- execution|external|information|motivated_reasoning|second_order
+  category text not null check (category in ('execution','external','information','motivated_reasoning','second_order')),
   severity risk_severity not null,
   likelihood numeric(4,3),                  -- model-estimated, optional
   source risk_source not null default 'ai',
@@ -103,11 +103,12 @@ create table checkins (
   horizon checkin_horizon not null,
   scheduled_for timestamptz not null,
   status checkin_status not null default 'pending',
-  trigger_run_id text,                      -- Trigger.dev run handle (P1 cancellation)
+  trigger_run_id text,                      -- Trigger.dev run handle; the wake task noops unless this matches (guards early-fire on reschedule) — also P1 cancellation
   outcome_notes text,
-  overall_attribution attribution,          -- required at completion (app-enforced); M9 input
+  overall_attribution attribution,          -- required at completion; M9 input
   completed_at timestamptz,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  check (status <> 'completed' or (overall_attribution is not null and completed_at is not null))
 );
 
 -- What actually went wrong, linked back to pre-mortem risks (or unlisted)
@@ -137,6 +138,7 @@ create table judge_scores (
   decision_id uuid not null references decisions(id) on delete cascade,
   prompt_version text not null references prompt_versions(id),
   model text not null,
+  input_hash text not null,     -- hash of the exact assembled judge input; makes any score reproducible (integrity rule 3)
   scores jsonb not null,        -- {risk_comprehensiveness, calibration_given_knowable, process_quality} ints 1–5
   rationale jsonb not null,     -- {rationale:{<dim>:text}, evidence_spans:[...]} — the judge output's top-level evidence_spans array nests here (no separate column)
   contamination boolean not null default false,  -- judge flagged outcome info in input
@@ -168,22 +170,27 @@ create index on decisions (user_id, status);
 create index on decision_events (decision_id, created_at);
 create index on forecasts (decision_id);
 create index on forecasts (user_id, resolved);
+create index on forecasts (resolved_in_checkin_id);
 create index on premortem_risks (premortem_id);
 create index on checkins (status, scheduled_for);   -- reconciliation cron scan
 create index on checkins (decision_id);
+create unique index on checkins (decision_id, horizon) where horizon <> 'custom';  -- no dup standard horizons (double-commit guard)
 create index on checkin_failures (checkin_id);
 create index on judge_scores (decision_id);
 ```
 
 ## RLS
 
-- Every user table: `enable row level security` + policies for select/insert/update/delete where `user_id = auth.uid()`; inserts must set `user_id = auth.uid()` (with-check).
+- Every user table: `enable row level security` with **select** policies where `user_id = auth.uid()`. Writes are service-role only (rule 0), so the `authenticated` role gets **no insert/update/delete policies** — the browser reads its own rows but cannot write any table directly. Ownership and cross-row lineage (a child row's parent must belong to the same user, and to the same decision where rule 4 applies) are enforced in the server action, because the service-role client bypasses RLS and an FK cannot express lineage.
 - `prompt_versions`: readable by authenticated users; writable by service role only.
-- `eval_items`, `eval_runs`: service role only.
-- Policy tests are required (T11): anon reads nothing; user A cannot read user B's seed rows.
+- `eval_items`, `eval_runs`: **`enable row level security` with zero policies** (deny-all to non-service roles). "Service role only" MUST be RLS-enabled — an RLS-*disabled* table is served to every key by PostgREST, leaking gold-set content.
+- Policy tests are required (T11): anon reads nothing; an authenticated user reads zero eval rows; user A cannot read user B's rows; an insert with a mismatched `user_id`, or a child row whose parent belongs to another user, is rejected.
 
 ## Integrity rules enforced in application code (tested)
 
-1. Commit transition (`draft → active`) sets `decided_at`, writes a `committed` event, creates 3 check-in rows, and freezes decision-time fields — subsequent edits only via `revised` events with payload diffs.
-2. `recalled_probability` may only be written while `resolved = false` for that forecast, and the check-in UI must capture it before rendering the recorded value (F2 AC).
-3. Judge input assembly selects **only**: title, context, rationale, options_considered, chosen_option, stakes, reversibility, forecasts (question + probability + desired), pre-mortem risks. An assertion test greps the assembled payload for outcome fields.
+0. **Mutations to user tables go through server actions/route handlers only.** Those actions use the **service-role** client (RLS bypassed) and enforce `user_id` ownership plus the invariants below in application code; the browser's `authenticated` role gets **select policies only** (no insert/update/delete), so it cannot write user tables directly via PostgREST and therefore cannot bypass these invariants. Several of them (ordering, the commit transaction, cross-row lineage) cannot be expressed in RLS at all, which is why enforcement lives in the action layer, not in policies.
+1. Commit transition (`draft → active`) atomically sets `decided_at`, writes a `committed` event, and creates 3 check-in rows. The judge-input fields (title, context, rationale, options_considered, chosen_option, stakes, reversibility) become **immutable after commit**: `revised`/`reversed`/`reaffirmed` events are annotations layered on top, never edits to the frozen fields. The same freeze covers child judge-input: at commit each forecast's `question`/`probability`/`desired` and all pre-mortem risks become immutable — only forecast *resolution* fields (`resolved`, `outcome`, `resolved_at`, `resolved_in_checkin_id`, `recalled_probability`, `recalled_at`, `revealed_at`) stay writable, at check-ins. This makes outcome-blindness provable by construction — the rows *are* the decision-time record, and `judge_scores.input_hash` stays verifiable by reassembly.
+2. `recalled_probability` is **write-once** and may only be written while `revealed_at IS NULL` for that forecast; the write sets `recalled_at`. The check-in flow sets `revealed_at` when it first surfaces the recorded value. (F2 AC + M3 correctness: a recall captured after the value was seen is contamination — this makes the invariant DB-checkable, not dependent on flow order, which matters because a forecast can pass through several check-ins before resolving.)
+3. Judge input assembly selects **only**: title, context, rationale, options_considered, chosen_option, stakes, reversibility, forecasts (question + probability + desired), pre-mortem risks. An assertion test greps the assembled payload for outcome fields; the payload's hash is stored on `judge_scores.input_hash` so any score is reproducible against exactly what the judge saw.
+4. `checkin_failures.linked_risk_id`, when set, must reference a `premortem_risk` belonging to the **same decision** as the failure's check-in (enforced in the failure-writing action — an FK cannot express it). A cross-decision link silently corrupts M10.
+5. Resolving or abandoning a decision sets its remaining `pending`/`due` check-ins to `skipped`, so scheduled tasks and the reconciliation cron never resurface them (see ADR-1 self-noop).
