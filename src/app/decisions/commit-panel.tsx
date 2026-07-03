@@ -50,8 +50,7 @@ export function CommitPanel({ decisionId }: CommitPanelProps) {
         setErrors(result.errors);
         return;
       }
-      // no decision list/detail page yet (T27) — home is the only place left to send them
-      router.push("/");
+      router.push(`/decisions/${decisionId}`);
     });
   }
 
