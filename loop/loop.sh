@@ -53,8 +53,11 @@ reset_work() { # discard any residue, fork a clean loop/work from main
   git checkout -q -b "$WORK"
 }
 
-gate_ok() { # runner's own ground-truth check; skipped pre-T01 (no package.json/check)
+gate_ok() { # runner's ground-truth check + CI parity; skipped pre-T01 (no package.json/check)
   [[ -f package.json ]] && grep -q '"check"' package.json || return 0
+  # run the exact CI install step first so lockfile / build-script drift (which the
+  # warm-node_modules `pnpm check` misses) fails the gate here, not only in CI.
+  pnpm install --frozen-lockfile >> loop/loop.log 2>&1 || return 1
   pnpm check >> loop/loop.log 2>&1
 }
 
