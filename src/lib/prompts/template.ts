@@ -9,21 +9,23 @@ export type PromptTemplate = {
 
 // small mustache-lite renderer — just enough for the sections our prompt
 // files actually use: {{var}}, {{#list}}...{{/list}}, {{#flag}}...{{/flag}}
+// single pass over sections AND variables, so a substituted value that itself
+// contains "{{...}}" (e.g. a user's forecast question) is never rescanned as a directive
 export function renderTemplate(template: string, context: Record<string, unknown>): string {
-  const withSections = template.replace(
-    /{{#(\w+)}}([\s\S]*?){{\/\1}}/g,
-    (_match, key: string, inner: string) => {
-      const value = context[key];
-      if (Array.isArray(value)) {
-        return value.map((item) => renderTemplate(inner, item as Record<string, unknown>)).join("");
+  return template.replace(
+    /{{#(\w+)}}([\s\S]*?){{\/\1}}|{{(\w+)}}/g,
+    (_match, sectionKey: string | undefined, inner: string | undefined, varKey: string | undefined) => {
+      if (sectionKey !== undefined) {
+        const value = context[sectionKey];
+        if (Array.isArray(value)) {
+          return value.map((item) => renderTemplate(inner ?? "", item as Record<string, unknown>)).join("");
+        }
+        return value ? renderTemplate(inner ?? "", context) : "";
       }
-      return value ? renderTemplate(inner, context) : "";
+      const value = context[varKey as string];
+      return value === undefined || value === null ? "" : String(value);
     },
   );
-  return withSections.replace(/{{(\w+)}}/g, (_match, key: string) => {
-    const value = context[key];
-    return value === undefined || value === null ? "" : String(value);
-  });
 }
 
 export async function loadPromptTemplate(name: string): Promise<PromptTemplate> {

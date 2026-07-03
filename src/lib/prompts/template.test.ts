@@ -24,6 +24,15 @@ describe("renderTemplate", () => {
   it("drops unknown variables to empty string", () => {
     expect(renderTemplate("x{{missing}}y", {})).toBe("xy");
   });
+
+  it("does not rescan a substituted value that contains braces (injection guard)", () => {
+    const out = renderTemplate("{{#items}}{{q}}{{/items}} | {{rationale}}", {
+      items: [{ q: "Will {{rationale}} hold?" }],
+      rationale: "SECRET",
+    });
+    // the {{rationale}} inside the forecast question must survive verbatim
+    expect(out).toBe("Will {{rationale}} hold? | SECRET");
+  });
 });
 
 describe("loadPromptTemplate", () => {
