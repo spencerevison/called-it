@@ -58,10 +58,13 @@ gate_ok() { # runner's own ground-truth check; skipped pre-T01 (no package.json/
   pnpm check >> loop/loop.log 2>&1
 }
 
-review() { # <diff-range> <task-line> <mode: task|quality> -> writes loop/REVIEW.md, echoes VERDICT line
-  local range="$1" taskline="$2" mode="$3" diff prompt out
+review() { # <diff-range> <task-line> <mode: task|quality> -> writes loop/REVIEW.md, echoes the VERDICT line (empty if the reviewer produced none)
+  local range="$1" taskline="$2" mode="$3" diff prompt out body
+  # strip reviewer.md's YAML frontmatter: a -p prompt string starting with "---" makes the
+  # claude CLI arg parser reject it ("unknown option '---'") and the reviewer never runs.
+  body="$(awk 'NR==1&&/^---[[:space:]]*$/{fm=1;next} fm&&/^---[[:space:]]*$/{fm=0;next} !fm' .claude/agents/reviewer.md)"
   diff="$(git diff "$range")"
-  prompt="$(cat .claude/agents/reviewer.md)
+  prompt="${body}
 
 You are reviewing in **${mode}** mode. Task context (from loop/TASKS.md):
 ${taskline}
@@ -76,7 +79,7 @@ Read any files you need for context. End with exactly one VERDICT line."
         --allowedTools "Read Grep Glob" 2>&1)"
   printf '%s\n' "$out" > loop/REVIEW.md
   { echo "--- review ($mode) ${range} $(ts) ---"; printf '%s\n' "$out"; } >> loop/loop.log
-  printf '%s\n' "$out" | grep -E '^VERDICT:' | tail -1
+  printf '%s\n' "$out" | grep -iE 'VERDICT:[[:space:]]*(pass|flag)' | tail -1
 }
 
 phase_of() { case "$1" in T20) echo P2;; T28) echo P3;; T31) echo P4;; T36) echo P5;; T39) echo P6;; T44) echo P7;; *) echo P?;; esac; }
@@ -144,9 +147,14 @@ for i in $(seq 1 "$MAX_ITER"); do
     while : ; do
       vline="$(review "main..$WORK" "$taskline" task)"
       log "review: ${vline:-<no verdict>}"
-      if printf '%s' "$vline" | grep -q 'VERDICT: pass'; then verdict="pass"; break; fi
+      # empty = reviewer never produced a verdict (invocation/harness error, not a code flag) — HALT, don't fix-cycle
+      if [[ -z "$vline" ]]; then
+        { echo; echo "### $task review ERROR — no verdict ($(ts))"; cat loop/REVIEW.md; } >> loop/QUESTIONS.md
+        halt "" "reviewer produced no VERDICT on $task — invocation/harness error, not a finding. See loop/REVIEW.md."
+      fi
+      if printf '%s' "$vline" | grep -qiE 'VERDICT:[[:space:]]*pass'; then verdict="pass"; break; fi
 
-      sev="$(printf '%s' "$vline" | grep -oE 'severity=(low|medium|high)' | cut -d= -f2)"
+      sev="$(printf '%s' "$vline" | grep -oiE 'severity=(low|medium|high)' | cut -d= -f2)"
       # immediate HALT: high-sev on an auth/DB path — never auto-fix these
       if [[ "$sev" == "high" && "$HALT_TASKS" == *" $task "* ]]; then
         { echo; echo "### $task review HALT ($(ts))"; cat loop/REVIEW.md; } >> loop/QUESTIONS.md
@@ -179,7 +187,10 @@ for i in $(seq 1 "$MAX_ITER"); do
     log "quality gate $ph: reviewing ${base}..main"
     vline="$(review "${base}..main" "QUALITY GATE $ph (cumulative diff since $base)" quality)"
     log "quality gate $ph: ${vline:-<no verdict>}"
-    if printf '%s' "$vline" | grep -q 'VERDICT: pass'; then
+    if [[ -z "$vline" ]]; then
+      { echo; echo "### quality gate $ph review ERROR — no verdict ($(ts))"; cat loop/REVIEW.md; } >> loop/QUESTIONS.md
+      halt "" "quality gate $ph reviewer produced no VERDICT — harness error. See loop/REVIEW.md."
+    elif printf '%s' "$vline" | grep -qiE 'VERDICT:[[:space:]]*pass'; then
       git tag -f "qg-pass-$ph" >/dev/null 2>&1
       [[ "$PUSH" == 1 ]] && git push -q -f origin --tags 2>>loop/loop.log
     else

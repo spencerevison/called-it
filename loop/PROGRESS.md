@@ -1,7 +1,7 @@
 # PROGRESS — called-it build log
 
-Format: `<ISO timestamp> | T## | gates: pass|fail → blocked | <short-sha> | <one-line note>`
-Appended by the loop, one line per iteration. Humans read bottom-up.
+Format: `T## | gates: pass|fail → blocked | <short-sha> | <one-line note>`
+Appended by the author, one line per iteration. Times live in loop/loop.log (real runner clock); the leading timestamps on T01–T10 below were author-guessed and are unreliable. Humans read bottom-up.
 
 ---
 

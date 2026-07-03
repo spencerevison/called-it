@@ -40,7 +40,7 @@ Log to `loop/QUESTIONS.md` **any deviation from a literal spec instruction**, no
 1. Check the box in `loop/TASKS.md`.
 2. Commit: `feat(T##): <summary>` (or `fix`/`chore`). One task = one commit (a follow-up fixer commit may be added later by the runner — that's fine).
 3. Append one line to `loop/PROGRESS.md`:
-   `<ISO timestamp> | T## | gates: pass | <short-sha> | <one-line note>`
+   `T## | gates: pass | <short-sha> | <one-line note>` (no timestamp — you have no reliable clock; loop.log carries the authoritative times)
 4. Stop. Do not start the next task. Do not merge or push.
 
 ## On failure (red gates while authoring)
