@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DecisionForm } from "@/app/decisions/decision-form";
+import { ForecastList } from "@/app/decisions/forecast-list";
 
 export default async function EditDecisionPage({
   params,
@@ -24,22 +25,32 @@ export default async function EditDecisionPage({
     ? decision.options_considered.map((option) => String(option))
     : [];
 
+  const { data: forecasts } = await supabase
+    .from("forecasts")
+    .select("id, question, probability, desired, resolve_by")
+    .eq("decision_id", decision.id)
+    .order("created_at", { ascending: true });
+
   return (
-    <main className="mx-auto max-w-xl px-4 py-8">
-      <h1 className="mb-6 text-lg font-semibold">Edit decision</h1>
-      <DecisionForm
-        mode="edit"
-        decisionId={decision.id}
-        initial={{
-          title: decision.title,
-          context: decision.context,
-          rationale: decision.rationale,
-          options,
-          chosenOption: decision.chosen_option,
-          stakes: decision.stakes,
-          reversibility: decision.reversibility,
-        }}
-      />
+    <main className="mx-auto max-w-xl px-4 py-8 space-y-10">
+      <div>
+        <h1 className="mb-6 text-lg font-semibold">Edit decision</h1>
+        <DecisionForm
+          mode="edit"
+          decisionId={decision.id}
+          initial={{
+            title: decision.title,
+            context: decision.context,
+            rationale: decision.rationale,
+            options,
+            chosenOption: decision.chosen_option,
+            stakes: decision.stakes,
+            reversibility: decision.reversibility,
+          }}
+        />
+      </div>
+
+      <ForecastList decisionId={decision.id} forecasts={forecasts ?? []} />
     </main>
   );
 }
