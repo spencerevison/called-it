@@ -92,6 +92,17 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     return { ok: false, errors: ["Pre-mortems can only be generated while the decision is a draft."] };
   }
 
+  // capture the previous latest premortem *before* inserting the new one, so any
+  // hand-added user risks on it can be carried forward below (regenerate must not
+  // silently orphan them - see loop/QUESTIONS.md T25)
+  const { data: previousPremortem } = await service
+    .from("premortems")
+    .select("id")
+    .eq("decision_id", decisionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { data: premortem, error: insertError } = await service
     .from("premortems")
     .insert({
@@ -124,6 +135,37 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     // no transaction available, so compensate manually to avoid an orphaned empty premortem
     await service.from("premortems").delete().eq("id", premortem.id);
     return { ok: false, errors: [risksError.message] };
+  }
+
+  if (previousPremortem) {
+    const { data: userRisks, error: userRisksError } = await service
+      .from("premortem_risks")
+      .select("description, category, severity, user_id")
+      .eq("premortem_id", previousPremortem.id)
+      .eq("source", "user");
+
+    if (userRisksError) {
+      await service.from("premortems").delete().eq("id", premortem.id);
+      return { ok: false, errors: [userRisksError.message] };
+    }
+
+    if (userRisks && userRisks.length > 0) {
+      const { error: carryForwardError } = await service.from("premortem_risks").insert(
+        userRisks.map((risk) => ({
+          user_id: risk.user_id,
+          premortem_id: premortem.id,
+          description: risk.description,
+          category: risk.category,
+          severity: risk.severity,
+          source: "user" as const,
+        })),
+      );
+
+      if (carryForwardError) {
+        await service.from("premortems").delete().eq("id", premortem.id);
+        return { ok: false, errors: [carryForwardError.message] };
+      }
+    }
   }
 
   return { ok: true, id: premortem.id };
@@ -185,6 +227,20 @@ export async function addUserRisk(premortemId: string, formData: FormData): Prom
 
   if (decisionError || !decision || decision.status !== "draft") {
     return { ok: false, errors: ["Risks can only be added while the decision is a draft."] };
+  }
+
+  // a regenerate in another tab can leave this premortemId pointing at an inert
+  // history row - writing there would silently vanish from the rendered panel
+  const { data: latestPremortem } = await service
+    .from("premortems")
+    .select("id")
+    .eq("decision_id", premortem.decision_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!latestPremortem || latestPremortem.id !== premortemId) {
+    return { ok: false, errors: ["This pre-mortem has been regenerated — reload the page."] };
   }
 
   const { data, error } = await service

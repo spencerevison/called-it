@@ -12,6 +12,8 @@ const risksInsert = vi.fn();
 const premortemDeleteEq = vi.fn();
 const premortemFetchSingle = vi.fn();
 const userRiskInsertSingle = vi.fn();
+const latestPremortemMaybeSingle = vi.fn();
+const userRisksSelect = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(() => ({
@@ -24,12 +26,19 @@ vi.mock("@/lib/supabase/service", () => ({
       }
       if (table === "premortems") {
         return {
-          select: vi.fn(() => ({ eq: vi.fn(() => ({ single: premortemFetchSingle })) })),
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: premortemFetchSingle,
+              order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: latestPremortemMaybeSingle })) })),
+            })),
+          })),
           insert: vi.fn(() => ({ select: vi.fn(() => ({ single: premortemInsertSingle })) })),
           delete: vi.fn(() => ({ eq: premortemDeleteEq })),
         };
       }
+      // premortem_risks
       return {
+        select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: userRisksSelect })) })),
         insert: vi.fn((arg) => {
           if (Array.isArray(arg)) return risksInsert(arg);
           risksInsert(arg);
@@ -88,12 +97,17 @@ describe("generatePremortem", () => {
     risksInsert.mockReset();
     premortemDeleteEq.mockReset();
     generatePremortemRisks.mockReset();
+    latestPremortemMaybeSingle.mockReset();
+    userRisksSelect.mockReset();
     hasAnthropicKey.mockReturnValue(true);
 
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     forecastsSelect.mockResolvedValue({ data: [] });
     risksInsert.mockResolvedValue({ error: null });
     premortemDeleteEq.mockResolvedValue({ error: null });
+    // no previous premortem by default -> nothing to carry forward
+    latestPremortemMaybeSingle.mockResolvedValue({ data: null });
+    userRisksSelect.mockResolvedValue({ data: [] });
   });
 
   it("requires an authenticated user", async () => {
@@ -218,6 +232,25 @@ describe("generatePremortem", () => {
       })),
     );
   });
+
+  it("carries the user's own risks forward onto the new premortem on regenerate", async () => {
+    decisionFetchSingle.mockResolvedValue({ data: draftDecision(), error: null });
+    const aiRisks = [{ description: "ai risk", category: "execution", severity: "medium", likelihood: 0.3 }];
+    generatePremortemRisks.mockResolvedValue({ ok: true, risks: aiRisks });
+    premortemInsertSingle.mockResolvedValue({ data: { id: "pm2" }, error: null });
+    latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm1" } });
+    userRisksSelect.mockResolvedValue({
+      data: [{ description: "my own risk", category: "external", severity: "high", user_id: "u1" }],
+    });
+
+    const { generatePremortem } = await import("./premortem-actions");
+    const result = await generatePremortem("d1");
+
+    expect(result).toEqual({ ok: true, id: "pm2" });
+    expect(risksInsert).toHaveBeenNthCalledWith(2, [
+      { user_id: "u1", premortem_id: "pm2", description: "my own risk", category: "external", severity: "high", source: "user" },
+    ]);
+  });
 });
 
 function riskFormData(overrides: Partial<Record<string, string>> = {}) {
@@ -234,8 +267,11 @@ describe("addUserRisk", () => {
     decisionFetchSingle.mockReset();
     risksInsert.mockReset();
     userRiskInsertSingle.mockReset();
+    latestPremortemMaybeSingle.mockReset();
 
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    // default: the premortem being written to is the latest one for its decision
+    latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm1" } });
   });
 
   it("requires an authenticated user", async () => {
@@ -274,6 +310,18 @@ describe("addUserRisk", () => {
     const { addUserRisk } = await import("./premortem-actions");
     const result = await addUserRisk("pm1", riskFormData());
     expect(result).toEqual({ ok: false, errors: ["Risks can only be added while the decision is a draft."] });
+    expect(risksInsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects an add-risk against a premortem that's been superseded by a regenerate", async () => {
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1" }, error: null });
+    decisionFetchSingle.mockResolvedValue({ data: { status: "draft" }, error: null });
+    latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm2" } });
+
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData());
+
+    expect(result).toEqual({ ok: false, errors: ["This pre-mortem has been regenerated — reload the page."] });
     expect(risksInsert).not.toHaveBeenCalled();
   });
 
