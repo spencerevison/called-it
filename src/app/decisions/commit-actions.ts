@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { scheduleCheckinReminders } from "@/lib/checkins/schedule";
 
 export type CommitResult = { ok: true } | { ok: false; errors: string[] };
 
@@ -50,5 +51,7 @@ export async function commitDecision(decisionId: string, formData: FormData): Pr
     // same message whether not-found, not-owned, or not-draft — don't leak which
     return { ok: false, errors: ["Decision could not be committed."] };
   }
+
+  await scheduleCheckinReminders(decisionId);
   return { ok: true };
 }
