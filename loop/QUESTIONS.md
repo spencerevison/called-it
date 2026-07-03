@@ -10,6 +10,8 @@
 - T11: added `src/lib/supabase/service.ts` (service-role client) ahead of schedule — T03's note deferred it to "the first server action that needs service-role writes," but the T11 policy tests need a service-role client to seed/clean fixtures that bypass RLS. Minimal wrapper, same shape as the existing browser/server helpers.
 - T11: the task's AC also names "the server-action layer rejects a child row whose parent belongs to another user or another decision" — no server-action layer exists yet (DATA_MODEL rule 4, cross-decision `linked_risk_id` lineage), so that assertion isn't testable at T11. Left as a forward reference; whichever task builds the check-in-failure server action (P3) should carry this test, not T11.
 
+- T13: METRICS.md says "a separate aggregation service maps DB rows → these inputs" — read M6 (short/long horizon partition) and M9 (valence-from-forecasts derivation) as T20's job, not T13's; `horizonCalibrationGap`/`selfServingIndex` take pre-partitioned/pre-derived inputs rather than raw horizon-days or forecast lists. M10's vector gives only aggregates (5 decisions/8 knowable failures/5 linked/4 decisions with a link), not a decision-by-failure breakdown, so the test constructs one specific grouping that reproduces those aggregates — the exact assignment isn't normative, only the aggregate numbers are.
+
 ## Blocked tasks (detail behind [BLOCKED] tags in TASKS.md)
 
 ## Parking lot (good ideas outside SPEC scope — do not build)
