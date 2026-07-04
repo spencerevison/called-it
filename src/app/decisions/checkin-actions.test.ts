@@ -9,7 +9,8 @@ const checkinSingle = vi.fn();
 const forecastSingle = vi.fn();
 const forecastsListOrder = vi.fn();
 const checkinUpdateEq = vi.fn();
-const forecastUpdateEq = vi.fn();
+// conditional-update chain: .update().eq("id", ...).is/.eq(guard).select("id") -> resolves to {data, error}
+const forecastUpdateSelect = vi.fn();
 const revealRefetchSingle = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
@@ -36,7 +37,12 @@ vi.mock("@/lib/supabase/service", () => ({
             }),
           };
         }),
-        update: vi.fn(() => ({ eq: forecastUpdateEq })),
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            is: vi.fn(() => ({ select: forecastUpdateSelect })),
+            eq: vi.fn(() => ({ select: forecastUpdateSelect })),
+          })),
+        })),
       };
     }),
   })),
@@ -49,7 +55,7 @@ describe("checkin-actions", () => {
     forecastSingle.mockReset();
     forecastsListOrder.mockReset();
     checkinUpdateEq.mockReset();
-    forecastUpdateEq.mockReset();
+    forecastUpdateSelect.mockReset();
     revealRefetchSingle.mockReset();
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
   });
@@ -139,10 +145,23 @@ describe("checkin-actions", () => {
         data: { id: "f1", user_id: "u1", decision_id: "d1", resolved: false, revealed_at: null },
         error: null,
       });
-      forecastUpdateEq.mockResolvedValue({ error: null });
+      forecastUpdateSelect.mockResolvedValue({ data: [{ id: "f1" }], error: null });
       const { recordRecall } = await import("./checkin-actions");
       const result = await recordRecall("f1", 0.5);
       expect(result).toEqual({ ok: true });
+    });
+
+    it("rejects when a concurrent reveal wins the race (conditional update matches zero rows)", async () => {
+      forecastSingle.mockResolvedValue({
+        data: { id: "f1", user_id: "u1", decision_id: "d1", resolved: false, revealed_at: null },
+        error: null,
+      });
+      // read saw revealed_at: null, but the guarded write itself matched nothing --
+      // another request revealed it first
+      forecastUpdateSelect.mockResolvedValue({ data: [], error: null });
+      const { recordRecall } = await import("./checkin-actions");
+      const result = await recordRecall("f1", 0.5);
+      expect(result).toEqual({ ok: false, errors: ["Recall was already captured for this forecast."] });
     });
   });
 
@@ -152,7 +171,7 @@ describe("checkin-actions", () => {
         data: { id: "f1", user_id: "u1", decision_id: "d1", resolved: false, revealed_at: null },
         error: null,
       });
-      forecastUpdateEq.mockResolvedValue({ error: null });
+      forecastUpdateSelect.mockResolvedValue({ data: [{ id: "f1" }], error: null });
       revealRefetchSingle.mockResolvedValue({ data: { probability: 0.73 }, error: null });
 
       const { revealForecast } = await import("./checkin-actions");
@@ -196,11 +215,22 @@ describe("checkin-actions", () => {
         data: { id: "f1", user_id: "u1", decision_id: "d1", resolved: false, revealed_at: "2026-01-01T00:00:00Z" },
         error: null,
       });
-      forecastUpdateEq.mockResolvedValue({ error: null });
+      forecastUpdateSelect.mockResolvedValue({ data: [{ id: "f1" }], error: null });
 
       const { resolveForecast } = await import("./checkin-actions");
       const result = await resolveForecast("c1", "f1", "no");
       expect(result).toEqual({ ok: true });
+    });
+
+    it("rejects re-resolving an already-resolved forecast", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c2", user_id: "u1", decision_id: "d1", status: "due" }, error: null });
+      forecastSingle.mockResolvedValue({
+        data: { id: "f1", user_id: "u1", decision_id: "d1", resolved: true, revealed_at: "2026-01-01T00:00:00Z" },
+        error: null,
+      });
+      const { resolveForecast } = await import("./checkin-actions");
+      const result = await resolveForecast("c2", "f1", "no");
+      expect(result).toEqual({ ok: false, errors: ["This forecast has already been resolved."] });
     });
   });
 });

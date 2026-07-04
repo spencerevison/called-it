@@ -115,12 +115,17 @@ export async function recordRecall(forecastId: string, recalledProbability: numb
   if (!forecast) return { ok: false, errors: ["Forecast not found."] };
   if (forecast.revealed_at) return { ok: false, errors: ["Recall was already captured for this forecast."] };
 
-  const { error } = await service
+  const { data, error } = await service
     .from("forecasts")
     .update({ recalled_probability: recalledProbability, recalled_at: new Date().toISOString() })
-    .eq("id", forecastId);
+    .eq("id", forecastId)
+    .is("revealed_at", null)
+    .select("id");
 
   if (error) return { ok: false, errors: [error.message] };
+  if (!data || data.length === 0) {
+    return { ok: false, errors: ["Recall was already captured for this forecast."] };
+  }
   return { ok: true };
 }
 
@@ -137,13 +142,14 @@ export async function revealForecast(
   const forecast = await fetchOwnedForecast(service, forecastId, user.id);
   if (!forecast) return { ok: false, errors: ["Forecast not found."] };
 
-  if (!forecast.revealed_at) {
-    const { error } = await service
-      .from("forecasts")
-      .update({ revealed_at: new Date().toISOString() })
-      .eq("id", forecastId);
-    if (error) return { ok: false, errors: [error.message] };
-  }
+  const { error } = await service
+    .from("forecasts")
+    .update({ revealed_at: new Date().toISOString() })
+    .eq("id", forecastId)
+    .is("revealed_at", null)
+    .select("id");
+  // zero rows back just means another request already revealed it -- fine, fall through to the refetch
+  if (error) return { ok: false, errors: [error.message] };
 
   const { data, error: refetchError } = await service
     .from("forecasts")
@@ -180,8 +186,11 @@ export async function resolveForecast(
   if (!forecast.revealed_at) {
     return { ok: false, errors: ["Reveal the recorded probability before resolving."] };
   }
+  if (forecast.resolved) {
+    return { ok: false, errors: ["This forecast has already been resolved."] };
+  }
 
-  const { error } = await service
+  const { data, error } = await service
     .from("forecasts")
     .update({
       resolved: true,
@@ -189,8 +198,13 @@ export async function resolveForecast(
       resolved_at: new Date().toISOString(),
       resolved_in_checkin_id: checkinId,
     })
-    .eq("id", forecastId);
+    .eq("id", forecastId)
+    .eq("resolved", false)
+    .select("id");
 
   if (error) return { ok: false, errors: [error.message] };
+  if (!data || data.length === 0) {
+    return { ok: false, errors: ["This forecast has already been resolved."] };
+  }
   return { ok: true };
 }
