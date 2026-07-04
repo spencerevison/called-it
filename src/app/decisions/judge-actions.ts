@@ -62,7 +62,8 @@ export async function runJudge(decisionId: string): Promise<void> {
       .from("forecasts")
       .select("question, probability, desired")
       .eq("decision_id", decisionId)
-      .order("created_at");
+      .order("created_at")
+      .order("id");
 
     const { data: premortem } = await service
       .from("premortems")
@@ -77,6 +78,8 @@ export async function runJudge(decisionId: string): Promise<void> {
           .from("premortem_risks")
           .select("description, category, severity, source")
           .eq("premortem_id", premortem.id)
+          .order("created_at")
+          .order("id")
       : { data: [] as { description: string; category: string; severity: string; source: string }[] };
 
     const input = assembleJudgeInput({

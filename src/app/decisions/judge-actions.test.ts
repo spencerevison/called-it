@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const decisionFetchSingle = vi.fn();
+// forecasts/risks now chain two .order() calls (created_at, then id tiebreak) —
+// the tiebreak is what makes input_hash reproducible on reassembly, see REVIEW.md
 const forecastsSelect = vi.fn();
 const latestPremortemMaybeSingle = vi.fn();
 const risksSelect = vi.fn();
@@ -13,7 +15,11 @@ vi.mock("@/lib/supabase/service", () => ({
         return { select: vi.fn(() => ({ eq: vi.fn(() => ({ single: decisionFetchSingle })) })) };
       }
       if (table === "forecasts") {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ order: forecastsSelect })) })) };
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({ order: vi.fn(() => ({ order: forecastsSelect })) })),
+          })),
+        };
       }
       if (table === "premortems") {
         return {
@@ -26,7 +32,7 @@ vi.mock("@/lib/supabase/service", () => ({
         return { insert: judgeScoresInsert };
       }
       // premortem_risks
-      return { select: vi.fn(() => ({ eq: risksSelect })) };
+      return { select: vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(() => ({ order: risksSelect })) })) })) };
     }),
   })),
 }));
@@ -192,6 +198,24 @@ describe("runJudge", () => {
       forecasts: [],
       risks: [{ description: "d", category: "execution", severity: "medium", source: "ai" }],
     });
+    const insertedArgs = judgeScoresInsert.mock.calls[0][0];
+    expect(insertedArgs.input_hash).toBe(hashJudgeInput(expectedInput));
+  });
+
+  it("hashes risks in the order the (ordered) query returns them", async () => {
+    latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm1" } });
+    const orderedRisks = [
+      { description: "r1", category: "execution", severity: "medium", source: "ai" },
+      { description: "r2", category: "market", severity: "high", source: "ai" },
+    ];
+    risksSelect.mockResolvedValue({ data: orderedRisks });
+    generateJudgeScores.mockResolvedValue(validScores());
+
+    const { runJudge, assembleJudgeInput } = await import("./judge-actions");
+    const { hashJudgeInput } = await import("@/lib/llm/judge");
+    await runJudge("d1");
+
+    const expectedInput = assembleJudgeInput({ decision: activeDecision(), forecasts: [], risks: orderedRisks });
     const insertedArgs = judgeScoresInsert.mock.calls[0][0];
     expect(insertedArgs.input_hash).toBe(hashJudgeInput(expectedInput));
   });
