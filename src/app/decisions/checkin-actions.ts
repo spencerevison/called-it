@@ -235,7 +235,9 @@ export async function addCheckinFailure(checkinId: string, formData: FormData): 
   const service = createServiceClient();
   const checkin = await fetchOwnedCheckin(service, checkinId, user.id);
   if (!checkin) return { ok: false, errors: ["Check-in not found."] };
-  if (checkin.status === "completed") return { ok: false, errors: ["This check-in is already complete."] };
+  if (checkin.status !== "pending" && checkin.status !== "due") {
+    return { ok: false, errors: [`This check-in is ${checkin.status} and can no longer take failures.`] };
+  }
 
   let linkedRiskId: string | null = null;
   if (linkedRiskRaw !== "unlisted") {
@@ -288,13 +290,21 @@ export async function completeCheckin(checkinId: string, formData: FormData): Pr
   const service = createServiceClient();
   const checkin = await fetchOwnedCheckin(service, checkinId, user.id);
   if (!checkin) return { ok: false, errors: ["Check-in not found."] };
-  if (checkin.status === "completed") return { ok: false, errors: ["This check-in is already complete."] };
+  if (checkin.status !== "pending" && checkin.status !== "due") {
+    return { ok: false, errors: [`This check-in is ${checkin.status} and can no longer be completed.`] };
+  }
 
-  const { error } = await service
+  // conditional update is the real guard -- status check above is just the friendly early error
+  const { data, error } = await service
     .from("checkins")
     .update({ overall_attribution: attribution, status: "completed", completed_at: new Date().toISOString() })
-    .eq("id", checkinId);
+    .eq("id", checkinId)
+    .in("status", ["pending", "due"])
+    .select("id");
 
   if (error) return { ok: false, errors: [error.message] };
+  if (!data || data.length === 0) {
+    return { ok: false, errors: ["This check-in is no longer active."] };
+  }
   return { ok: true };
 }

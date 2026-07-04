@@ -8,7 +8,8 @@ vi.mock("@/lib/supabase/server", () => ({
 const checkinSingle = vi.fn();
 const forecastSingle = vi.fn();
 const forecastsListOrder = vi.fn();
-const checkinUpdateEq = vi.fn();
+const checkinUpdateEq = vi.fn(); // submitOutcomeNotes: .update().eq("id") awaited directly -> {error}
+const checkinUpdateInSelect = vi.fn(); // completeCheckin: .update().eq("id").in("status",[...]).select("id") -> {data, error}
 // conditional-update chain: .update().eq("id", ...).is/.eq(guard).select("id") -> resolves to {data, error}
 const forecastUpdateSelect = vi.fn();
 const revealRefetchSingle = vi.fn();
@@ -22,7 +23,12 @@ vi.mock("@/lib/supabase/service", () => ({
       if (table === "checkins") {
         return {
           select: vi.fn(() => ({ eq: vi.fn(() => ({ single: checkinSingle })) })),
-          update: vi.fn(() => ({ eq: checkinUpdateEq })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              in: vi.fn(() => ({ select: checkinUpdateInSelect })),
+              then: (resolve: (v: unknown) => void) => resolve(checkinUpdateEq()),
+            })),
+          })),
         };
       }
       if (table === "premortem_risks") {
@@ -67,6 +73,7 @@ describe("checkin-actions", () => {
     forecastSingle.mockReset();
     forecastsListOrder.mockReset();
     checkinUpdateEq.mockReset();
+    checkinUpdateInSelect.mockReset();
     forecastUpdateSelect.mockReset();
     revealRefetchSingle.mockReset();
     riskSingle.mockReset();
@@ -272,7 +279,14 @@ describe("checkin-actions", () => {
       checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "completed" }, error: null });
       const { addCheckinFailure } = await import("./checkin-actions");
       const result = await addCheckinFailure("c1", formWith({ description: "d", attribution: "skill" }));
-      expect(result).toEqual({ ok: false, errors: ["This check-in is already complete."] });
+      expect(result).toEqual({ ok: false, errors: ["This check-in is completed and can no longer take failures."] });
+    });
+
+    it("rejects a skipped check-in (terminal state, DATA_MODEL rule 5)", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "skipped" }, error: null });
+      const { addCheckinFailure } = await import("./checkin-actions");
+      const result = await addCheckinFailure("c1", formWith({ description: "d", attribution: "skill" }));
+      expect(result).toEqual({ ok: false, errors: ["This check-in is skipped and can no longer take failures."] });
     });
 
     it("inserts an unlisted failure with no linked risk", async () => {
@@ -332,15 +346,30 @@ describe("checkin-actions", () => {
       checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "completed" }, error: null });
       const { completeCheckin } = await import("./checkin-actions");
       const result = await completeCheckin("c1", formWith({ overall_attribution: "skill" }));
-      expect(result).toEqual({ ok: false, errors: ["This check-in is already complete."] });
+      expect(result).toEqual({ ok: false, errors: ["This check-in is completed and can no longer be completed."] });
+    });
+
+    it("rejects completing a skipped check-in (terminal state, DATA_MODEL rule 5)", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "skipped" }, error: null });
+      const { completeCheckin } = await import("./checkin-actions");
+      const result = await completeCheckin("c1", formWith({ overall_attribution: "skill" }));
+      expect(result).toEqual({ ok: false, errors: ["This check-in is skipped and can no longer be completed."] });
     });
 
     it("completes the check-in with the given attribution", async () => {
       checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "due" }, error: null });
-      checkinUpdateEq.mockResolvedValue({ error: null });
+      checkinUpdateInSelect.mockResolvedValue({ data: [{ id: "c1" }], error: null });
       const { completeCheckin } = await import("./checkin-actions");
       const result = await completeCheckin("c1", formWith({ overall_attribution: "mixed" }));
       expect(result).toEqual({ ok: true });
+    });
+
+    it("rejects when a concurrent completion wins the race (conditional update matches zero rows)", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "due" }, error: null });
+      checkinUpdateInSelect.mockResolvedValue({ data: [], error: null });
+      const { completeCheckin } = await import("./checkin-actions");
+      const result = await completeCheckin("c1", formWith({ overall_attribution: "mixed" }));
+      expect(result).toEqual({ ok: false, errors: ["This check-in is no longer active."] });
     });
   });
 });
