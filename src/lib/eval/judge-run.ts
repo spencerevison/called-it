@@ -68,8 +68,9 @@ export function renderJudgeReport(params: {
   date: string;
   itemIds: string[];
   agreement: AgreementResult;
+  contaminatedItemIds?: string[];
 }): string {
-  const { version, date, itemIds, agreement } = params;
+  const { version, date, itemIds, agreement, contaminatedItemIds = [] } = params;
   const rows = JUDGE_DIMENSIONS.map((dim) => {
     const a = agreement.perDimension[dim];
     return `| ${dim} | ${a.within1.toFixed(2)} | ${a.exact.toFixed(2)} | ${a.mae.toFixed(2)} |`;
@@ -79,6 +80,7 @@ export function renderJudgeReport(params: {
 
 n = ${itemIds.length}
 item ids: ${itemIds.join(", ")}
+contaminated: ${contaminatedItemIds.length}${contaminatedItemIds.length ? ` (${contaminatedItemIds.join(", ")})` : ""}
 
 | dimension | within1 | exact | mae |
 |---|---|---|---|

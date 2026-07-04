@@ -58,6 +58,7 @@ async function main() {
   const runId = randomUUID();
 
   const judged = [];
+  const contaminatedItemIds = [];
   for (const entry of entries) {
     const input = assembleJudgeInputFromGoldset(entry);
     const inputHash = hashJudgeInput(input);
@@ -78,6 +79,13 @@ async function main() {
 
     if (!result.ok) throw new Error(`eval:judge: item ${entry.id} failed — ${result.error}`);
 
+    // gold-set items are hand-written from decision-time notes (JUDGE_RUBRIC §Hand-labeling);
+    // contamination here means the entry itself leaked outcome content, not assembly.
+    if (result.contamination) {
+      console.warn(`eval:judge: item ${entry.id} flagged contamination — entry content likely leaks outcome`);
+      contaminatedItemIds.push(entry.id);
+    }
+
     judged.push({
       itemId: entry.id,
       human: entry.human_labels.judge_scores,
@@ -90,7 +98,9 @@ async function main() {
   const agreement = computeAgreement(judged);
   const disagreements = findDisagreements(judged);
 
-  console.log(`eval:judge ${version} — n=${judged.length}, macro within1=${agreement.macroWithin1.toFixed(2)}`);
+  console.log(
+    `eval:judge ${version} — n=${judged.length}, macro within1=${agreement.macroWithin1.toFixed(2)}, contaminated=${contaminatedItemIds.length}`,
+  );
   console.log(`${disagreements.length} disagreement case(s):`);
   for (const d of disagreements) {
     console.log(
@@ -109,14 +119,14 @@ async function main() {
   const reportRelPath = path.relative(path.resolve(__dirname, ".."), reportPath);
   writeFileSync(
     reportPath,
-    renderJudgeReport({ version, date, itemIds: entries.map((e) => e.id), agreement }),
+    renderJudgeReport({ version, date, itemIds: entries.map((e) => e.id), agreement, contaminatedItemIds }),
   );
 
   const { error: insertError } = await svc.from("eval_runs").insert({
     id: runId,
     kind: "judge_agreement",
     prompt_versions: [version],
-    metrics: agreement,
+    metrics: { ...agreement, contaminatedItemIds },
     report_path: reportRelPath,
   });
   if (insertError) throw insertError;

@@ -88,4 +88,26 @@ describe("renderJudgeReport", () => {
       expect(report).not.toContain(rationale);
     }
   });
+
+  it("surfaces contaminated item ids so a contaminated run is distinguishable in the audit trail", () => {
+    const agreement = computeAgreement([
+      {
+        itemId: exampleEntry.id,
+        human: exampleEntry.human_labels.judge_scores,
+        judge: { risk_comprehensiveness: 3, calibration_given_knowable: 4, process_quality: 3 },
+      },
+    ]);
+
+    const clean = renderJudgeReport({ version: "judge_v1", date: "2026-07-04", itemIds: [exampleEntry.id], agreement });
+    expect(clean).toContain("contaminated: 0");
+
+    const flagged = renderJudgeReport({
+      version: "judge_v1",
+      date: "2026-07-04",
+      itemIds: [exampleEntry.id],
+      agreement,
+      contaminatedItemIds: [exampleEntry.id],
+    });
+    expect(flagged).toContain(`contaminated: 1 (${exampleEntry.id})`);
+  });
 });
