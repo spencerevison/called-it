@@ -208,3 +208,93 @@ export async function resolveForecast(
   }
   return { ok: true };
 }
+
+const ATTRIBUTIONS = ["skill", "luck", "mixed"] as const;
+type Attribution = (typeof ATTRIBUTIONS)[number];
+
+function isAttribution(value: FormDataEntryValue | null): value is Attribution {
+  return typeof value === "string" && (ATTRIBUTIONS as readonly string[]).includes(value);
+}
+
+// step 3: what actually went wrong, per DATA_MODEL checkin_failures
+export async function addCheckinFailure(checkinId: string, formData: FormData): Promise<ActionResult> {
+  const description = String(formData.get("description") ?? "").trim();
+  const linkedRiskRaw = String(formData.get("linked_risk_id") ?? "unlisted");
+  const wasKnowable = formData.get("was_knowable") === "on";
+  const attribution = formData.get("attribution");
+
+  if (!description) return { ok: false, errors: ["A description is required."] };
+  if (!isAttribution(attribution)) return { ok: false, errors: ["Attribution must be skill, luck, or mixed."] };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, errors: ["Not signed in."] };
+
+  const service = createServiceClient();
+  const checkin = await fetchOwnedCheckin(service, checkinId, user.id);
+  if (!checkin) return { ok: false, errors: ["Check-in not found."] };
+  if (checkin.status === "completed") return { ok: false, errors: ["This check-in is already complete."] };
+
+  let linkedRiskId: string | null = null;
+  if (linkedRiskRaw !== "unlisted") {
+    // rule 4 (DATA_MODEL): a linked risk must belong to the same decision as the
+    // check-in -- an FK can't express that, so it's checked here via the risk's premortem
+    const { data: risk, error: riskError } = await service
+      .from("premortem_risks")
+      .select("id, premortem_id")
+      .eq("id", linkedRiskRaw)
+      .single();
+    if (riskError || !risk) return { ok: false, errors: ["Linked risk not found."] };
+
+    const { data: premortem, error: premortemError } = await service
+      .from("premortems")
+      .select("decision_id")
+      .eq("id", risk.premortem_id)
+      .single();
+    if (premortemError || !premortem || premortem.decision_id !== checkin.decision_id) {
+      return { ok: false, errors: ["Linked risk does not belong to this decision."] };
+    }
+    linkedRiskId = risk.id;
+  }
+
+  const { error } = await service.from("checkin_failures").insert({
+    user_id: user.id,
+    checkin_id: checkinId,
+    description,
+    linked_risk_id: linkedRiskId,
+    was_knowable: wasKnowable,
+    attribution,
+  });
+
+  if (error) return { ok: false, errors: [error.message] };
+  return { ok: true };
+}
+
+// step 4: overall_attribution is required at completion (DB check constraint backs this up)
+export async function completeCheckin(checkinId: string, formData: FormData): Promise<ActionResult> {
+  const attribution = formData.get("overall_attribution");
+  if (!isAttribution(attribution)) {
+    return { ok: false, errors: ["Overall attribution (skill, luck, or mixed) is required to complete a check-in."] };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, errors: ["Not signed in."] };
+
+  const service = createServiceClient();
+  const checkin = await fetchOwnedCheckin(service, checkinId, user.id);
+  if (!checkin) return { ok: false, errors: ["Check-in not found."] };
+  if (checkin.status === "completed") return { ok: false, errors: ["This check-in is already complete."] };
+
+  const { error } = await service
+    .from("checkins")
+    .update({ overall_attribution: attribution, status: "completed", completed_at: new Date().toISOString() })
+    .eq("id", checkinId);
+
+  if (error) return { ok: false, errors: [error.message] };
+  return { ok: true };
+}

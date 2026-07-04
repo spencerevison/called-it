@@ -26,6 +26,25 @@ export default async function CheckinFlowPage({
   const result = await getRecallForecasts(checkinId);
   if (!result.ok) notFound();
 
+  // same "most recent premortem" convention as the decision detail page (T25)
+  const { data: latestPremortem } = await supabase
+    .from("premortems")
+    .select("id")
+    .eq("decision_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: risks } = latestPremortem
+    ? await supabase.from("premortem_risks").select("id, description").eq("premortem_id", latestPremortem.id)
+    : { data: [] };
+
+  const { data: failures } = await supabase
+    .from("checkin_failures")
+    .select("id, description, linked_risk_id, was_knowable, attribution")
+    .eq("checkin_id", checkinId)
+    .order("created_at", { ascending: true });
+
   return (
     <main className="mx-auto max-w-xl px-4 py-8 space-y-8">
       <div className="space-y-1">
@@ -39,6 +58,9 @@ export default async function CheckinFlowPage({
         checkinId={checkin.id}
         initialOutcomeNotes={checkin.outcome_notes ?? ""}
         forecasts={result.forecasts}
+        risks={risks ?? []}
+        initialFailures={failures ?? []}
+        initialCompleted={checkin.status === "completed"}
       />
     </main>
   );

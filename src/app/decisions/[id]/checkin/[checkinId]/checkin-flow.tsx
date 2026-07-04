@@ -1,7 +1,14 @@
 "use client";
 
 import { useId, useState, useTransition } from "react";
-import { recordRecall, resolveForecast, revealForecast, submitOutcomeNotes } from "@/app/decisions/checkin-actions";
+import {
+  addCheckinFailure,
+  completeCheckin,
+  recordRecall,
+  resolveForecast,
+  revealForecast,
+  submitOutcomeNotes,
+} from "@/app/decisions/checkin-actions";
 
 type Forecast = {
   id: string;
@@ -14,14 +21,32 @@ type Forecast = {
   probability: number | null;
 };
 
+type Risk = { id: string; description: string };
+
+type Attribution = "skill" | "luck" | "mixed";
+
+type Failure = {
+  id: string;
+  description: string;
+  linked_risk_id: string | null;
+  was_knowable: boolean;
+  attribution: Attribution;
+};
+
 export function CheckinFlow({
   checkinId,
   initialOutcomeNotes,
   forecasts,
+  risks,
+  initialFailures,
+  initialCompleted,
 }: {
   checkinId: string;
   initialOutcomeNotes: string;
   forecasts: Forecast[];
+  risks: Risk[];
+  initialFailures: Failure[];
+  initialCompleted: boolean;
 }) {
   const [notes, setNotes] = useState(initialOutcomeNotes);
   const [notesSaved, setNotesSaved] = useState(false);
@@ -43,6 +68,9 @@ export function CheckinFlow({
   function updateRow(id: string, patch: Partial<Forecast>) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
+
+  const [failures, setFailures] = useState(initialFailures);
+  const [completed, setCompleted] = useState(initialCompleted);
 
   return (
     <div className="space-y-8">
@@ -84,6 +112,187 @@ export function CheckinFlow({
           </ul>
         )}
       </div>
+
+      <div className="space-y-4">
+        <h2 className="text-sm font-medium">What went wrong</h2>
+        {failures.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No failures logged yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {failures.map((f) => {
+              const risk = risks.find((r) => r.id === f.linked_risk_id);
+              return (
+                <li key={f.id} className="rounded-md border border-border p-3 text-sm">
+                  <p>{f.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {risk ? `linked: ${risk.description}` : "unlisted"} · {f.was_knowable ? "knowable" : "not knowable"} ·{" "}
+                    {f.attribution}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {!completed ? (
+          <FailureForm
+            checkinId={checkinId}
+            risks={risks}
+            onAdded={(failure) => setFailures((prev) => [...prev, failure])}
+          />
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium">Complete check-in</h2>
+        {completed ? (
+          <p className="text-sm text-muted-foreground">This check-in is complete.</p>
+        ) : (
+          <CompleteForm checkinId={checkinId} onCompleted={() => setCompleted(true)} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FailureForm({
+  checkinId,
+  risks,
+  onAdded,
+}: {
+  checkinId: string;
+  risks: Risk[];
+  onAdded: (failure: Failure) => void;
+}) {
+  const [description, setDescription] = useState("");
+  const [linkedRiskId, setLinkedRiskId] = useState("unlisted");
+  const [wasKnowable, setWasKnowable] = useState(false);
+  const [attribution, setAttribution] = useState<Attribution>("skill");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const descId = useId();
+
+  function submit() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("description", description);
+      fd.set("linked_risk_id", linkedRiskId);
+      if (wasKnowable) fd.set("was_knowable", "on");
+      fd.set("attribution", attribution);
+
+      const result = await addCheckinFailure(checkinId, fd);
+      if (!result.ok) {
+        setError(result.errors[0]);
+        return;
+      }
+      setError(null);
+      onAdded({
+        // client-only id for list keys -- the row itself has no round-trip id to echo back
+        id: `local-${Date.now()}-${description}`,
+        description,
+        linked_risk_id: linkedRiskId === "unlisted" ? null : linkedRiskId,
+        was_knowable: wasKnowable,
+        attribution,
+      });
+      setDescription("");
+      setLinkedRiskId("unlisted");
+      setWasKnowable(false);
+      setAttribution("skill");
+    });
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-border p-3">
+      <label htmlFor={descId} className="text-xs text-muted-foreground">
+        What happened?
+      </label>
+      <textarea
+        id={descId}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        className="w-full rounded-md border border-border bg-background p-2 text-sm"
+      />
+
+      <select
+        value={linkedRiskId}
+        onChange={(e) => setLinkedRiskId(e.target.value)}
+        className="w-full rounded-md border border-border bg-background p-1 text-sm"
+      >
+        <option value="unlisted">Unlisted (the pre-mortem missed it)</option>
+        {risks.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.description}
+          </option>
+        ))}
+      </select>
+
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <input type="checkbox" checked={wasKnowable} onChange={(e) => setWasKnowable(e.target.checked)} />
+        Knowable at decision time
+      </label>
+
+      <select
+        value={attribution}
+        onChange={(e) => setAttribution(e.target.value as Attribution)}
+        className="w-full rounded-md border border-border bg-background p-1 text-sm"
+      >
+        <option value="skill">Skill</option>
+        <option value="luck">Luck</option>
+        <option value="mixed">Mixed</option>
+      </select>
+
+      <button
+        type="button"
+        onClick={submit}
+        disabled={isPending || !description.trim()}
+        className="rounded-md border border-border px-3 py-1 text-sm"
+      >
+        Add failure
+      </button>
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+    </div>
+  );
+}
+
+function CompleteForm({ checkinId, onCompleted }: { checkinId: string; onCompleted: () => void }) {
+  const [attribution, setAttribution] = useState<Attribution>("skill");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function submit() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("overall_attribution", attribution);
+      const result = await completeCheckin(checkinId, fd);
+      if (!result.ok) {
+        setError(result.errors[0]);
+        return;
+      }
+      setError(null);
+      onCompleted();
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <select
+        value={attribution}
+        onChange={(e) => setAttribution(e.target.value as Attribution)}
+        className="w-full max-w-xs rounded-md border border-border bg-background p-1 text-sm"
+      >
+        <option value="skill">Skill</option>
+        <option value="luck">Luck</option>
+        <option value="mixed">Mixed</option>
+      </select>
+      <button
+        type="button"
+        onClick={submit}
+        disabled={isPending}
+        className="rounded-md border border-border px-3 py-1 text-sm"
+      >
+        Complete check-in
+      </button>
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>
   );
 }
