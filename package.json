@@ -13,7 +13,8 @@
     "test:db": "vitest run -c vitest.config.db.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
-    "db:seed": "node scripts/seed.mjs"
+    "db:seed": "node scripts/seed.mjs",
+    "db:register-prompts": "node scripts/register-prompts.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",
