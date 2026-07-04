@@ -7,9 +7,10 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { parseGoldsetEntry } from "../src/lib/eval/goldset.ts";
-import { assembleJudgeInputFromGoldset, findDisagreements, renderJudgeReport } from "../src/lib/eval/judge-run.ts";
+import { assembleJudgeInputFromGoldset, evalTraceTags, findDisagreements, renderJudgeReport } from "../src/lib/eval/judge-run.ts";
 import { computeAgreement } from "../src/lib/eval/agreement.ts";
 import { hashJudgeInput, generateJudgeScores } from "../src/lib/llm/judge.ts";
 import { hasAnthropicKey } from "../src/lib/llm/client.ts";
@@ -54,6 +55,7 @@ async function main() {
 
   const entries = rows.map((row) => parseGoldsetEntry(JSON.stringify(row.payload), row.id));
   const template = await loadPromptTemplate(version);
+  const runId = randomUUID();
 
   const judged = [];
   for (const entry of entries) {
@@ -68,6 +70,7 @@ async function main() {
       input: { itemId: entry.id, inputHash },
       promptVersion: version,
       rubricVersion: RUBRIC_VERSION,
+      tags: evalTraceTags(runId, version, entry.id),
     });
 
     const result = await generateJudgeScores({ model: template.model, system, user });
@@ -110,6 +113,7 @@ async function main() {
   );
 
   const { error: insertError } = await svc.from("eval_runs").insert({
+    id: runId,
     kind: "judge_agreement",
     prompt_versions: [version],
     metrics: agreement,

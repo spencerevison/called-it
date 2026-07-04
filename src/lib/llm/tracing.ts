@@ -27,6 +27,7 @@ export function startTrace(params: {
   input: Record<string, unknown>;
   promptVersion: string;
   rubricVersion?: string;
+  tags?: string[];
 }): LlmTrace {
   const langfuse = getLangfuseClient();
   if (!langfuse) {
@@ -36,6 +37,7 @@ export function startTrace(params: {
   const trace = langfuse.trace({
     name: params.name,
     input: params.input,
+    tags: params.tags,
     // JUDGE_RUBRIC §Protocol: judge calls carry rubric_version alongside prompt_version
     metadata: {
       promptVersion: params.promptVersion,

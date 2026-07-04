@@ -2,13 +2,23 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parseGoldsetEntry } from "./goldset";
-import { assembleJudgeInputFromGoldset, findDisagreements, renderJudgeReport } from "./judge-run";
+import { assembleJudgeInputFromGoldset, evalTraceTags, findDisagreements, renderJudgeReport } from "./judge-run";
 import { computeAgreement } from "./agreement";
 
 const exampleEntry = parseGoldsetEntry(
   readFileSync(path.join(process.cwd(), "goldset", "example-001.json"), "utf-8"),
   "example-001.json",
 );
+
+describe("evalTraceTags", () => {
+  it("tags every eval trace with run_id, prompt_version, item_id", () => {
+    expect(evalTraceTags("run-1", "judge_v1", "example-001.json")).toEqual([
+      "run_id:run-1",
+      "prompt_version:judge_v1",
+      "item_id:example-001.json",
+    ]);
+  });
+});
 
 describe("assembleJudgeInputFromGoldset", () => {
   it("carries only decision-time fields + forecasts, risks empty", () => {

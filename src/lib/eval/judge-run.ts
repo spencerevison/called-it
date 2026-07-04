@@ -23,6 +23,12 @@ export function assembleJudgeInputFromGoldset(entry: GoldsetEntry): JudgeInput {
   };
 }
 
+// EVAL_PLAN §2 — every eval trace carries run_id/prompt_version/item_id so cost
+// and latency are queryable per-run in Langfuse (traces can't be tagged after the fact).
+export function evalTraceTags(runId: string, promptVersion: string, itemId: string): string[] {
+  return [`run_id:${runId}`, `prompt_version:${promptVersion}`, `item_id:${itemId}`];
+}
+
 export type DisagreementCase = {
   itemId: string;
   dimension: (typeof JUDGE_DIMENSIONS)[number];
