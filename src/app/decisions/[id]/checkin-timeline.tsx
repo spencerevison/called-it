@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type Checkin = {
   id: string;
   horizon: string;
@@ -13,7 +15,7 @@ const HORIZON_LABELS: Record<string, string> = {
   custom: "Custom",
 };
 
-export function CheckinTimeline({ checkins }: { checkins: Checkin[] }) {
+export function CheckinTimeline({ decisionId, checkins }: { decisionId: string; checkins: Checkin[] }) {
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-medium">Check-ins</h2>
@@ -22,19 +24,29 @@ export function CheckinTimeline({ checkins }: { checkins: Checkin[] }) {
         <p className="text-sm text-muted-foreground">No check-ins scheduled.</p>
       ) : (
         <ul className="space-y-2">
-          {checkins.map((c) => (
-            <li
-              key={c.id}
-              className="flex items-center justify-between rounded-md border border-border p-3 text-sm"
-            >
-              <span>{HORIZON_LABELS[c.horizon] ?? c.horizon}</span>
-              <span className="text-xs text-muted-foreground">
-                {c.status === "completed" && c.completed_at
-                  ? `completed ${new Date(c.completed_at).toLocaleDateString()}`
-                  : `${c.status} · scheduled ${new Date(c.scheduled_for).toLocaleDateString()}`}
-              </span>
-            </li>
-          ))}
+          {checkins.map((c) => {
+            const statusLabel =
+              c.status === "completed" && c.completed_at
+                ? `completed ${new Date(c.completed_at).toLocaleDateString()}`
+                : `${c.status} · scheduled ${new Date(c.scheduled_for).toLocaleDateString()}`;
+            const canWalk = c.status !== "completed" && c.status !== "skipped";
+
+            return (
+              <li
+                key={c.id}
+                className="flex items-center justify-between rounded-md border border-border p-3 text-sm"
+              >
+                <span>{HORIZON_LABELS[c.horizon] ?? c.horizon}</span>
+                {canWalk ? (
+                  <Link href={`/decisions/${decisionId}/checkin/${c.id}`} className="text-xs text-accent">
+                    {statusLabel}
+                  </Link>
+                ) : (
+                  <span className="text-xs text-muted-foreground">{statusLabel}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

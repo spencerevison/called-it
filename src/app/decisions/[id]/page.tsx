@@ -109,7 +109,7 @@ export default async function DecisionDetailPage({
         isDraft={false}
       />
 
-      <CheckinTimeline checkins={checkins ?? []} />
+      <CheckinTimeline decisionId={decision.id} checkins={checkins ?? []} />
 
       <EventsPanel decisionId={decision.id} events={(events ?? []) as DecisionEvent[]} />
     </main>

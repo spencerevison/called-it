@@ -29,7 +29,7 @@ export default async function DuePage() {
           {checkins.map((c) => (
             <li key={c.id}>
               <Link
-                href={`/decisions/${c.decision_id}`}
+                href={`/decisions/${c.decision_id}/checkin/${c.id}`}
                 className="flex items-center justify-between rounded-md border border-border p-3 hover:border-accent"
               >
                 <span className="text-sm">{c.decisions?.title ?? "Untitled decision"}</span>
