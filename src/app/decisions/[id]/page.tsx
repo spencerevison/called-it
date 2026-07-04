@@ -5,6 +5,12 @@ import { CheckinTimeline } from "./checkin-timeline";
 import { PremortemPanel, type Risk } from "@/app/decisions/premortem-panel";
 import { EventsPanel, type DecisionEvent } from "@/app/decisions/events-panel";
 import { ResolvePanel } from "@/app/decisions/resolve-panel";
+import { JudgePanel } from "./judge-panel";
+import { judgeIsTrusted } from "@/lib/llm/judge-rubric";
+import type { JudgeDimension } from "@/lib/llm/judge";
+
+// shape of the judge_scores.rationale jsonb column per DATA_MODEL.md
+type StoredJudgeRationale = { rationale: Record<JudgeDimension, string>; evidence_spans: string[] };
 
 export default async function DecisionDetailPage({
   params,
@@ -69,6 +75,14 @@ export default async function DecisionDetailPage({
     .eq("decision_id", decision.id)
     .order("scheduled_for", { ascending: true });
 
+  const { data: judgeScore } = await supabase
+    .from("judge_scores")
+    .select("scores, rationale")
+    .eq("decision_id", decision.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { data: events } = await supabase
     .from("decision_events")
     .select("id, event_type, payload, created_at")
@@ -108,6 +122,19 @@ export default async function DecisionDetailPage({
         premortemId={latestPremortem?.id ?? null}
         risks={(risks ?? []) as Risk[]}
         isDraft={false}
+      />
+
+      <JudgePanel
+        judge={
+          judgeScore
+            ? {
+                scores: judgeScore.scores as Record<JudgeDimension, number>,
+                rationale: (judgeScore.rationale as StoredJudgeRationale).rationale,
+                evidenceSpans: (judgeScore.rationale as StoredJudgeRationale).evidence_spans,
+              }
+            : null
+        }
+        trusted={judgeIsTrusted()}
       />
 
       <CheckinTimeline decisionId={decision.id} checkins={checkins ?? []} />
