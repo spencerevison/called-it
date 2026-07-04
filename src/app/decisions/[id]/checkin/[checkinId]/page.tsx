@@ -61,7 +61,7 @@ export default async function CheckinFlowPage({
         forecasts={result.forecasts}
         risks={risks ?? []}
         initialFailures={failures ?? []}
-        initialCompleted={checkin.status === "completed"}
+        initialStatus={checkin.status}
       />
 
       {decision.status === "active" ? <ResolvePanel decisionId={id} /> : null}

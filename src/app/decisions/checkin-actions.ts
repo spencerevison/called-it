@@ -76,6 +76,9 @@ export async function submitOutcomeNotes(checkinId: string, formData: FormData):
   const service = createServiceClient();
   const checkin = await fetchOwnedCheckin(service, checkinId, user.id);
   if (!checkin) return { ok: false, errors: ["Check-in not found."] };
+  if (checkin.status !== "pending" && checkin.status !== "due") {
+    return { ok: false, errors: [`This check-in is ${checkin.status} and can no longer be edited.`] };
+  }
 
   const { error } = await service.from("checkins").update({ outcome_notes: notes }).eq("id", checkinId);
   if (error) return { ok: false, errors: [error.message] };
@@ -177,6 +180,11 @@ export async function resolveForecast(
   const service = createServiceClient();
   const checkin = await fetchOwnedCheckin(service, checkinId, user.id);
   if (!checkin) return { ok: false, errors: ["Check-in not found."] };
+  // a forecast resolved into a terminal check-in would stamp resolved_in_checkin_id
+  // onto it after overall_attribution was set -- retroactively re-classifying M9's valence.
+  if (checkin.status !== "pending" && checkin.status !== "due") {
+    return { ok: false, errors: [`This check-in is ${checkin.status} and can no longer resolve forecasts.`] };
+  }
 
   const forecast = await fetchOwnedForecast(service, forecastId, user.id);
   if (!forecast) return { ok: false, errors: ["Forecast not found."] };

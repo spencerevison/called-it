@@ -254,6 +254,43 @@ describe("checkin-actions", () => {
       const result = await resolveForecast("c2", "f1", "no");
       expect(result).toEqual({ ok: false, errors: ["This forecast has already been resolved."] });
     });
+
+    it("rejects resolving into a completed check-in (would corrupt M9 valence)", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "completed" }, error: null });
+      const { resolveForecast } = await import("./checkin-actions");
+      const result = await resolveForecast("c1", "f1", "yes");
+      expect(result).toEqual({ ok: false, errors: ["This check-in is completed and can no longer resolve forecasts."] });
+    });
+
+    it("rejects resolving into a skipped check-in", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "skipped" }, error: null });
+      const { resolveForecast } = await import("./checkin-actions");
+      const result = await resolveForecast("c1", "f1", "yes");
+      expect(result).toEqual({ ok: false, errors: ["This check-in is skipped and can no longer resolve forecasts."] });
+    });
+  });
+
+  describe("submitOutcomeNotes", () => {
+    function notesForm(text: string): FormData {
+      const fd = new FormData();
+      fd.set("outcome_notes", text);
+      return fd;
+    }
+
+    it("saves notes while the check-in is active", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "due" }, error: null });
+      checkinUpdateEq.mockReturnValue({ error: null });
+      const { submitOutcomeNotes } = await import("./checkin-actions");
+      const result = await submitOutcomeNotes("c1", notesForm("went sideways"));
+      expect(result).toEqual({ ok: true });
+    });
+
+    it("rejects editing a terminal (skipped) check-in", async () => {
+      checkinSingle.mockResolvedValue({ data: { id: "c1", user_id: "u1", decision_id: "d1", status: "skipped" }, error: null });
+      const { submitOutcomeNotes } = await import("./checkin-actions");
+      const result = await submitOutcomeNotes("c1", notesForm("too late"));
+      expect(result).toEqual({ ok: false, errors: ["This check-in is skipped and can no longer be edited."] });
+    });
   });
 
   describe("addCheckinFailure", () => {

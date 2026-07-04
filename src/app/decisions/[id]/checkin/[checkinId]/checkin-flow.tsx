@@ -39,14 +39,14 @@ export function CheckinFlow({
   forecasts,
   risks,
   initialFailures,
-  initialCompleted,
+  initialStatus,
 }: {
   checkinId: string;
   initialOutcomeNotes: string;
   forecasts: Forecast[];
   risks: Risk[];
   initialFailures: Failure[];
-  initialCompleted: boolean;
+  initialStatus: string;
 }) {
   const [notes, setNotes] = useState(initialOutcomeNotes);
   const [notesSaved, setNotesSaved] = useState(false);
@@ -70,7 +70,10 @@ export function CheckinFlow({
   }
 
   const [failures, setFailures] = useState(initialFailures);
-  const [completed, setCompleted] = useState(initialCompleted);
+  const [status, setStatus] = useState(initialStatus);
+  // completed or skipped (T35) both make the flow read-only; every action below also
+  // rejects server-side — this just stops presenting controls that would fail.
+  const terminal = status === "completed" || status === "skipped";
 
   return (
     <div className="space-y-8">
@@ -87,16 +90,19 @@ export function CheckinFlow({
             setNotesSaved(false);
           }}
           rows={4}
+          readOnly={terminal}
           className="w-full rounded-md border border-border bg-background p-2 text-sm"
         />
-        <button
-          type="button"
-          onClick={saveNotes}
-          disabled={isPending}
-          className="rounded-md border border-border px-3 py-1 text-sm"
-        >
-          Save notes
-        </button>
+        {!terminal ? (
+          <button
+            type="button"
+            onClick={saveNotes}
+            disabled={isPending}
+            className="rounded-md border border-border px-3 py-1 text-sm"
+          >
+            Save notes
+          </button>
+        ) : null}
         {notesSaved ? <span className="ml-2 text-xs text-muted-foreground">Saved.</span> : null}
       </div>
 
@@ -107,7 +113,7 @@ export function CheckinFlow({
         ) : (
           <ul className="space-y-3">
             {rows.map((f) => (
-              <ForecastRow key={f.id} checkinId={checkinId} forecast={f} onChange={(patch) => updateRow(f.id, patch)} />
+              <ForecastRow key={f.id} checkinId={checkinId} forecast={f} terminal={terminal} onChange={(patch) => updateRow(f.id, patch)} />
             ))}
           </ul>
         )}
@@ -133,7 +139,7 @@ export function CheckinFlow({
             })}
           </ul>
         )}
-        {!completed ? (
+        {!terminal ? (
           <FailureForm
             checkinId={checkinId}
             risks={risks}
@@ -144,10 +150,14 @@ export function CheckinFlow({
 
       <div className="space-y-2">
         <h2 className="text-sm font-medium">Complete check-in</h2>
-        {completed ? (
-          <p className="text-sm text-muted-foreground">This check-in is complete.</p>
+        {terminal ? (
+          <p className="text-sm text-muted-foreground">
+            {status === "skipped"
+              ? "This check-in was skipped because the decision was resolved — it is read-only."
+              : "This check-in is complete."}
+          </p>
         ) : (
-          <CompleteForm checkinId={checkinId} onCompleted={() => setCompleted(true)} />
+          <CompleteForm checkinId={checkinId} onCompleted={() => setStatus("completed")} />
         )}
       </div>
     </div>
@@ -300,10 +310,12 @@ function CompleteForm({ checkinId, onCompleted }: { checkinId: string; onComplet
 function ForecastRow({
   checkinId,
   forecast,
+  terminal,
   onChange,
 }: {
   checkinId: string;
   forecast: Forecast;
+  terminal: boolean;
   onChange: (patch: Partial<Forecast>) => void;
 }) {
   const [recalled, setRecalled] = useState("");
@@ -347,6 +359,16 @@ function ForecastRow({
     return (
       <li className="rounded-md border border-border p-3 text-sm text-muted-foreground">
         {forecast.question} — resolved {forecast.outcome ? "yes" : "no"}
+      </li>
+    );
+  }
+
+  // terminal check-in: read-only, no recall/reveal/resolve controls (the server rejects them too)
+  if (terminal) {
+    return (
+      <li className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+        {forecast.question}
+        {forecast.revealed_at && forecast.probability !== null ? ` — recorded p = ${forecast.probability.toFixed(2)}` : ""}
       </li>
     );
   }
