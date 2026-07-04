@@ -539,6 +539,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      resolve_decision: {
+        Args: {
+          p_decision_id: string
+          p_status: Database["public"]["Enums"]["decision_status"]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       attribution: "skill" | "luck" | "mixed"

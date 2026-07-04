@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getRecallForecasts } from "@/app/decisions/checkin-actions";
+import { ResolvePanel } from "@/app/decisions/resolve-panel";
 import { CheckinFlow } from "./checkin-flow";
 
 export default async function CheckinFlowPage({
@@ -20,7 +21,7 @@ export default async function CheckinFlowPage({
 
   if (!checkin || checkin.decision_id !== id) notFound();
 
-  const { data: decision } = await supabase.from("decisions").select("title").eq("id", id).single();
+  const { data: decision } = await supabase.from("decisions").select("title, status").eq("id", id).single();
   if (!decision) notFound();
 
   const result = await getRecallForecasts(checkinId);
@@ -62,6 +63,8 @@ export default async function CheckinFlowPage({
         initialFailures={failures ?? []}
         initialCompleted={checkin.status === "completed"}
       />
+
+      {decision.status === "active" ? <ResolvePanel decisionId={id} /> : null}
     </main>
   );
 }

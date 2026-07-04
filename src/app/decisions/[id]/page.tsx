@@ -4,6 +4,7 @@ import { ForecastTimeline } from "./forecast-timeline";
 import { CheckinTimeline } from "./checkin-timeline";
 import { PremortemPanel, type Risk } from "@/app/decisions/premortem-panel";
 import { EventsPanel, type DecisionEvent } from "@/app/decisions/events-panel";
+import { ResolvePanel } from "@/app/decisions/resolve-panel";
 
 export default async function DecisionDetailPage({
   params,
@@ -112,6 +113,8 @@ export default async function DecisionDetailPage({
       <CheckinTimeline decisionId={decision.id} checkins={checkins ?? []} />
 
       <EventsPanel decisionId={decision.id} events={(events ?? []) as DecisionEvent[]} />
+
+      {decision.status === "active" ? <ResolvePanel decisionId={decision.id} /> : null}
     </main>
   );
 }
