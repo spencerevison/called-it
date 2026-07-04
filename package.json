@@ -15,7 +15,8 @@
     "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
     "db:seed": "node scripts/seed.mjs",
     "db:register-prompts": "node scripts/register-prompts.mjs",
-    "eval:import": "node scripts/eval-import.mjs"
+    "eval:import": "node scripts/eval-import.mjs",
+    "eval:judge": "node scripts/eval-judge.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",
