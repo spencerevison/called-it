@@ -3,15 +3,15 @@
 // such hook exists in this repo yet and adding one is out of scope here —
 // logged in QUESTIONS.md. Mirrors seed.mjs's env-loading + service-role setup.
 //
-// The parse/drift logic itself lives in src/lib/prompts/registry.ts (unit
-// tested); this script duplicates just enough of it in plain JS since
-// scripts/ isn't run through a TS loader (same tradeoff seed.mjs already made).
+// The parse/drift logic is the unit-tested src/lib/prompts/registry.ts — imported
+// directly (Node 22.18+ strips the .ts types natively) so there's exactly one
+// implementation and the tests cover the code this script actually runs.
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { parsePromptHeader, planPromptRegistration } from "../src/lib/prompts/registry.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, "..", ".env.local");
@@ -28,26 +28,6 @@ const svc = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
-function parsePromptHeader(raw, filePath) {
-  const systemIdx = raw.indexOf("---SYSTEM---");
-  if (systemIdx === -1) throw new Error(`${filePath}: missing ---SYSTEM--- marker`);
-  const header = raw.slice(0, systemIdx);
-
-  const idMatch = header.match(/^#\s*(\S+)/m);
-  if (!idMatch) throw new Error(`${filePath}: missing "# <id>" header line`);
-  const kindMatch = header.match(/^kind:\s*(.+)$/m);
-  if (!kindMatch) throw new Error(`${filePath}: missing "kind:" header line`);
-  const notesMatch = header.match(/^notes:\s*(.+)$/m);
-
-  return {
-    id: idMatch[1].trim(),
-    kind: kindMatch[1].trim(),
-    filePath,
-    contentHash: createHash("sha256").update(raw).digest("hex"),
-    notes: notesMatch ? notesMatch[1].trim() : null,
-  };
-}
-
 async function main() {
   const promptsDir = path.resolve(__dirname, "..", "prompts");
   const files = readdirSync(promptsDir).filter((f) => f.endsWith(".md"));
@@ -57,22 +37,12 @@ async function main() {
 
   const { data: existing, error } = await svc.from("prompt_versions").select("id, content_hash");
   if (error) throw error;
-  const existingById = new Map((existing ?? []).map((row) => [row.id, row.content_hash]));
 
-  const inserts = [];
-  for (const prompt of parsed) {
-    const registeredHash = existingById.get(prompt.id);
-    if (registeredHash === undefined) {
-      inserts.push(prompt);
-      continue;
-    }
-    if (registeredHash !== prompt.contentHash) {
-      throw new Error(
-        `${prompt.filePath}: registered content_hash for "${prompt.id}" no longer matches the file on disk — ` +
-          `bump the version suffix (e.g. _v2) instead of editing a registered prompt in place`,
-      );
-    }
-  }
+  // registry uses camelCase contentHash; the DB column is content_hash
+  const inserts = planPromptRegistration(
+    parsed,
+    (existing ?? []).map((row) => ({ id: row.id, contentHash: row.content_hash })),
+  );
 
   if (inserts.length === 0) {
     console.log("prompt_versions up to date, nothing to register.");

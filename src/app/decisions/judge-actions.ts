@@ -5,6 +5,7 @@ import { loadPromptTemplate, renderTemplate } from "@/lib/prompts/template";
 import { startTrace } from "@/lib/llm/tracing";
 
 const PROMPT_VERSION = "judge_v1";
+const RUBRIC_VERSION = "v1"; // JUDGE_RUBRIC.md version; traced alongside prompt_version per §Protocol
 
 // DATA_MODEL integrity rule 3 — select only decision-time, outcome-free fields.
 // Kept as its own function so a test can assert the payload never carries an
@@ -94,7 +95,7 @@ export async function runJudge(decisionId: string): Promise<void> {
     const systemPrompt = renderTemplate(template.system, promptContext);
     const userPrompt = renderTemplate(template.user, promptContext);
 
-    const trace = startTrace({ name: "judge", input: { decisionId }, promptVersion: PROMPT_VERSION });
+    const trace = startTrace({ name: "judge", input: { decisionId }, promptVersion: PROMPT_VERSION, rubricVersion: RUBRIC_VERSION });
 
     const result = await generateJudgeScores({ model: template.model, system: systemPrompt, user: userPrompt });
     if (!result.ok) {
