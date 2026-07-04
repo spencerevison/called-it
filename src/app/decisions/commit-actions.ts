@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { scheduleCheckinReminders } from "@/lib/checkins/schedule";
+import { runJudge } from "./judge-actions";
 
 export type CommitResult = { ok: true } | { ok: false; errors: string[] };
 
@@ -53,5 +54,6 @@ export async function commitDecision(decisionId: string, formData: FormData): Pr
   }
 
   await scheduleCheckinReminders(decisionId);
+  await runJudge(decisionId);
   return { ok: true };
 }
