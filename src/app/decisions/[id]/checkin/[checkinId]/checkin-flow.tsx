@@ -165,7 +165,7 @@ function FailureForm({
 }) {
   const [description, setDescription] = useState("");
   const [linkedRiskId, setLinkedRiskId] = useState("unlisted");
-  const [wasKnowable, setWasKnowable] = useState(false);
+  const [wasKnowable, setWasKnowable] = useState(true);
   const [attribution, setAttribution] = useState<Attribution>("skill");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -195,7 +195,7 @@ function FailureForm({
       });
       setDescription("");
       setLinkedRiskId("unlisted");
-      setWasKnowable(false);
+      setWasKnowable(true);
       setAttribution("skill");
     });
   }
