@@ -154,6 +154,8 @@ describe("runJudge", () => {
         contamination: false,
       }),
     );
+    // JUDGE_RUBRIC §Protocol: the trace must carry rubric_version alongside prompt_version
+    expect(startTrace).toHaveBeenCalledWith(expect.objectContaining({ rubricVersion: "v1" }));
   });
 
   it("logs a warning and still persists when the judge flags contamination", async () => {
