@@ -46,6 +46,28 @@ export function calibrationCurve(forecasts: ForecastPO[]): CalibrationBin[] {
     }));
 }
 
+// M1 — Rolling Brier (trailing window, plotted by resolution date)
+export type BrierTrendPoint = { resolvedAt: string; value: number; n: number };
+
+// ponytail: O(n^2) window scan, fine at dashboard scale — switch to a sliding
+// two-pointer pass if resolved-forecast counts ever get large.
+export function rollingBrier(
+  forecasts: (ForecastPO & { resolvedAt: string })[],
+  windowDays = 90
+): BrierTrendPoint[] {
+  const sorted = [...forecasts].sort((a, b) => a.resolvedAt.localeCompare(b.resolvedAt));
+  const windowMs = windowDays * 86_400_000;
+  return sorted.map((f) => {
+    const t = Date.parse(f.resolvedAt);
+    const inWindow = sorted.filter((g) => {
+      const gt = Date.parse(g.resolvedAt);
+      return gt <= t && gt > t - windowMs;
+    });
+    const { value, n } = brier(inWindow);
+    return { resolvedAt: f.resolvedAt, value: value!, n };
+  });
+}
+
 // M3 — Hindsight bias coefficient
 export type RecalledForecast = ForecastPO & { r: number };
 

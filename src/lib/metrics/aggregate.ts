@@ -13,6 +13,7 @@ import {
   horizonCalibrationGap,
   optionsConsideredCount,
   reversalRate,
+  rollingBrier,
   selfServingIndex,
   premortemSurfaceRate,
   type ForecastPO,
@@ -99,6 +100,11 @@ export async function getDashboardMetrics(userId: string, fetcher: MetricsRowFet
   const briersResult = brier(resolvedPO);
   const calibration: CalibrationBin[] = calibrationCurve(resolvedPO);
 
+  const trendInput = resolved
+    .filter((f) => f.resolvedAt !== null)
+    .map((f) => ({ p: f.probability, o: (f.outcome ? 1 : 0) as 0 | 1, resolvedAt: f.resolvedAt! }));
+  const brierTrend = rollingBrier(trendInput);
+
   const hindsightInput = resolved
     .filter((f) => f.recalledProbability !== null)
     .map((f) => ({ p: f.probability, o: (f.outcome ? 1 : 0) as 0 | 1, r: f.recalledProbability! }));
@@ -153,6 +159,7 @@ export async function getDashboardMetrics(userId: string, fetcher: MetricsRowFet
   return {
     brier: gate(briersResult.value, briersResult.n, 5),
     calibrationCurve: calibration,
+    brierTrend: gate(brierTrend, briersResult.n, 5),
     hindsightBias: gate(hindsightResult.value, hindsightResult.n, 5),
     optimismBias: {
       desired: gate(optimismResult.desired.value, optimismResult.desired.n, 5),

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createSupabaseMetricsFetcher } from "@/lib/metrics/supabase-fetcher";
 import { getDashboardMetrics } from "@/lib/metrics/aggregate";
+import { CalibrationChart, BrierTrendChart } from "./charts";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -44,6 +45,28 @@ export default async function DashboardPage() {
               : `Insufficient data — needs ${metrics.brier.minN}, have ${metrics.brier.n}.`
           }
         />
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium">Calibration</h2>
+          <CalibrationChart bins={metrics.calibrationCurve} />
+          <p className="text-xs text-muted-foreground">
+            Dots on the diagonal mean your stated probabilities matched what actually happened. Greyed dots have
+            fewer than 5 forecasts in that bin.
+          </p>
+        </section>
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium">Brier trend</h2>
+          {metrics.brierTrend.sufficient ? (
+            <BrierTrendChart points={metrics.brierTrend.value!} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Insufficient data — needs {metrics.brierTrend.minN}, have {metrics.brierTrend.n}.
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">Rolling Brier score over a trailing 90-day window.</p>
+        </section>
       </div>
     </main>
   );

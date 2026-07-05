@@ -85,6 +85,10 @@ describe("getDashboardMetrics (seed fixture)", () => {
     expect(m.calibrationCurve).toHaveLength(7);
     expect(m.calibrationCurve.every((b) => b.n === 1)).toBe(true);
 
+    // M1 rolling — same n=7 gate as brier, one point per resolved forecast
+    expect(m.brierTrend.sufficient).toBe(true);
+    expect(m.brierTrend.value).toHaveLength(7);
+
     // M3 — n=2, insufficient (min 5) -> gated to null
     expect(m.hindsightBias.n).toBe(2);
     expect(m.hindsightBias.sufficient).toBe(false);

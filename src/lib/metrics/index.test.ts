@@ -9,6 +9,7 @@ import {
   optionsConsideredCount,
   premortemSurfaceRate,
   reversalRate,
+  rollingBrier,
   selfServingIndex,
 } from "./index";
 
@@ -30,6 +31,33 @@ describe("brier", () => {
     const { value, n } = brier([]);
     expect(value).toBeNull();
     expect(n).toBe(0);
+  });
+});
+
+// M1 — Rolling Brier
+describe("rollingBrier", () => {
+  it("plots each point over its trailing window", () => {
+    const forecasts = [
+      { p: 0.9, o: 1 as const, resolvedAt: "2026-01-01" },
+      { p: 0.6, o: 1 as const, resolvedAt: "2026-01-10" },
+      // 200 days later — outside the first two's 90d window
+      { p: 0.2, o: 0 as const, resolvedAt: "2026-07-20" },
+    ];
+    const points = rollingBrier(forecasts, 90);
+    expect(points).toHaveLength(3);
+    expect(points[0].resolvedAt).toBe("2026-01-01");
+    expect(points[0].value).toBeCloseTo(0.01, 9);
+    expect(points[0].n).toBe(1);
+    expect(points[1].resolvedAt).toBe("2026-01-10");
+    expect(points[1].value).toBeCloseTo((0.01 + 0.16) / 2, 9);
+    expect(points[1].n).toBe(2);
+    expect(points[2].resolvedAt).toBe("2026-07-20");
+    expect(points[2].value).toBeCloseTo(0.04, 9);
+    expect(points[2].n).toBe(1);
+  });
+
+  it("empty input", () => {
+    expect(rollingBrier([])).toEqual([]);
   });
 });
 
