@@ -66,18 +66,43 @@ export async function runJudge(decisionId: string): Promise<void> {
       .order("created_at")
       .order("id");
 
-    // judge input is scoped to the chosen option's premortem only (DATA_MODEL rule 3,
-    // T58) - null chosen_option is the legacy/single-option path, same as the null-option
-    // premortem, so pre-P10 decisions hash identically. Non-chosen options' premortems
-    // are retained as the decision-time record but never selected here.
-    const premortemQuery = service.from("premortems").select("id").eq("decision_id", decisionId);
-    const { data: premortem } = await (decision.chosen_option
-      ? premortemQuery.eq("option", decision.chosen_option)
-      : premortemQuery.is("option", null)
-    )
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // judge input is scoped to the chosen option's premortem (DATA_MODEL rule 3, T58).
+    // null chosen_option -> null-option premortem, same as before. When an option IS
+    // chosen but only a null-option premortem exists (legacy/pre-P10 drafts, T55
+    // backfill), fall back to that so legacy decisions still hash the same as before P10.
+    let premortem: { id: string } | null = null;
+    if (decision.chosen_option) {
+      const { data } = await service
+        .from("premortems")
+        .select("id")
+        .eq("decision_id", decisionId)
+        .eq("option", decision.chosen_option)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      premortem = data;
+      if (!premortem) {
+        const { data: legacy } = await service
+          .from("premortems")
+          .select("id")
+          .eq("decision_id", decisionId)
+          .is("option", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        premortem = legacy;
+      }
+    } else {
+      const { data } = await service
+        .from("premortems")
+        .select("id")
+        .eq("decision_id", decisionId)
+        .is("option", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      premortem = data;
+    }
 
     const { data: risks } = premortem
       ? await service

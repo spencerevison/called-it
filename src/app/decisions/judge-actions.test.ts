@@ -153,6 +153,7 @@ describe("runJudge", () => {
   });
 
   it("scopes the premortem lookup to the chosen option (T58)", async () => {
+    latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm1" } });
     risksSelect.mockResolvedValue({ data: [] });
     generateJudgeScores.mockResolvedValue(validScores());
 
@@ -173,6 +174,31 @@ describe("runJudge", () => {
 
     expect(premortemIsSpy).toHaveBeenCalledWith("option", null);
     expect(premortemEqOptionSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the null-option premortem when a chosen option has none (legacy drafts, T58 fix)", async () => {
+    // eq("option", "a") finds nothing (pre-P10 draft only ever got a null-option premortem);
+    // the is("option", null) lookup that follows is what should supply the risks.
+    latestPremortemMaybeSingle.mockResolvedValueOnce({ data: null }).mockResolvedValueOnce({ data: { id: "legacy-1" } });
+    risksSelect.mockResolvedValue({
+      data: [{ description: "legacy risk", category: "execution", severity: "medium", source: "ai" }],
+    });
+    generateJudgeScores.mockResolvedValue(validScores());
+
+    const { runJudge, assembleJudgeInput } = await import("./judge-actions");
+    const { hashJudgeInput } = await import("@/lib/llm/judge");
+    await runJudge("d1");
+
+    expect(premortemEqOptionSpy).toHaveBeenCalledWith("option", "a");
+    expect(premortemIsSpy).toHaveBeenCalledWith("option", null);
+
+    const expectedInput = assembleJudgeInput({
+      decision: activeDecision(),
+      forecasts: [],
+      risks: [{ description: "legacy risk", category: "execution", severity: "medium", source: "ai" }],
+    });
+    const insertedArgs = judgeScoresInsert.mock.calls[0][0];
+    expect(insertedArgs.input_hash).toBe(hashJudgeInput(expectedInput));
   });
 
   it("persists judge_scores on a clean scoring pass", async () => {
