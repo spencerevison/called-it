@@ -47,9 +47,14 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         {user ? (
           <header className="flex items-center justify-between border-b border-border px-4 py-2">
-            <Link href="/due" className="text-sm text-muted-foreground hover:text-foreground">
-              Due{dueCount > 0 ? ` (${dueCount})` : ""}
-            </Link>
+            <nav className="flex gap-4">
+              <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
+                Dashboard
+              </Link>
+              <Link href="/due" className="text-sm text-muted-foreground hover:text-foreground">
+                Due{dueCount > 0 ? ` (${dueCount})` : ""}
+              </Link>
+            </nav>
             <form action={signOut}>
               <button
                 type="submit"
