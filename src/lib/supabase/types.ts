@@ -441,6 +441,7 @@ export type Database = {
           id: string
           langfuse_trace_id: string | null
           model: string
+          option: string | null
           prompt_version: string
           user_id: string
         }
@@ -450,6 +451,7 @@ export type Database = {
           id?: string
           langfuse_trace_id?: string | null
           model: string
+          option?: string | null
           prompt_version: string
           user_id: string
         }
@@ -459,6 +461,7 @@ export type Database = {
           id?: string
           langfuse_trace_id?: string | null
           model?: string
+          option?: string | null
           prompt_version?: string
           user_id?: string
         }

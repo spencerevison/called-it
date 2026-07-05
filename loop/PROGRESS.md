@@ -62,3 +62,4 @@ All non-[DEFER] tasks are checked or blocked (T53). The remaining [DEFER] task T
 
 ## SUMMARY (2026-07-04T19:00:18-0700)
 All tasks checked or blocked.
+T55 | gates: pass | pending-commit | supabase/migrations/20260704000001_premortem_option.sql — nullable premortems.option (NULL = legacy/whole-decision) + index (decision_id, option); verified via supabase db reset (fresh) then pnpm db:seed (existing rows read back option=null) then pnpm db:types (regenerated, diff is additive-only). Foundation for T56-T58 per-option pre-mortem work.
