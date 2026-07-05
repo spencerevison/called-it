@@ -34,6 +34,8 @@ Every task in `loop/TASKS.md` carries one tag. The runner gates review off the t
 
 Per flagged commit: Sonnet fixer → Fable re-review, up to **N=3** cycles. If still flagged after the 3rd cycle, the fixer escalates to `claude-opus-4-8` for one more cycle. Still flagged after that → HALT. (A deep task can surface a *different* genuine finding each cycle — severity trending down is the signal it's converging, not stuck; the raised cap gives it room to finish before halting for a human.)
 
+**Potential improvement (observed, not yet implemented):** quality-gate flags currently HALT for a human (below). But across P5–P7, every quality-gate flag had a precise, mechanically-applicable prescription that a fixer resolved cleanly — the "cross-cutting drift needs a human" assumption proved in practice to be "needs a fixer applying a prescription." A future harness could route quality-gate flags through the same fixer→re-review cycle as per-diff flags (auto-fix, escalate, HALT only if unclearable or the fixer disputes), removing the mandatory per-phase human stop while keeping the catch. Kept as a HALT for this build because the fixes were the operator's judgment calls on a first run.
+
 ## HALT taxonomy (stop, checkpoint on `loop/work`, wait for a human)
 
 - Reviewer can't clear a finding within the escalation cap.
