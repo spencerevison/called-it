@@ -1,0 +1,30 @@
+{
+  "id": "gs-fixture-b",
+  "_note": "T44 CI smoke fixture — mocked judge scores within1 but not exact (diff 1 all dims), see eval-smoke/smoke.test.ts",
+  "decision": {
+    "title": "Switch on-call rotation from weekly to bi-weekly",
+    "context": "On-call burnout complaints have been rising for two quarters running.",
+    "rationale": "Bi-weekly halves exposure per engineer at the cost of longer individual shifts.",
+    "options_considered": ["Keep weekly", "Bi-weekly", "Hire a dedicated on-call contractor"],
+    "chosen_option": "Bi-weekly",
+    "decided_on": "2025-02-01",
+    "stakes": "low",
+    "reversibility": "two_way"
+  },
+  "forecasts": [
+    { "question": "Burnout complaints drop within one quarter", "probability": 0.6, "desired": true, "outcome": true }
+  ],
+  "outcome": {
+    "summary": "Complaints dropped noticeably; no other side effects noted.",
+    "failures": []
+  },
+  "human_labels": {
+    "judge_scores": { "risk_comprehensiveness": 2, "calibration_given_knowable": 3, "process_quality": 5 },
+    "score_rationales": {
+      "risk_comprehensiveness": "Only the obvious burnout angle considered, no coverage-gap risk: 2.",
+      "calibration_given_knowable": "0.6 is plausible but not strongly justified: 3.",
+      "process_quality": "Three options, explicit tradeoff, contractor option properly costed out: 5."
+    },
+    "expected_premortem_risks": []
+  }
+}

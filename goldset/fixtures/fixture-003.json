@@ -1,0 +1,32 @@
+{
+  "id": "gs-fixture-c",
+  "_note": "T44 CI smoke fixture — mocked judge scores disagree on every dim (diff 3, outside within1), see eval-smoke/smoke.test.ts",
+  "decision": {
+    "title": "Rewrite the deploy script in a new language",
+    "context": "The bash deploy script has grown past 800 lines and nobody enjoys touching it.",
+    "rationale": "Chose to rewrite in Python for readability, accepting the migration risk.",
+    "options_considered": ["Rewrite in Python", "Incrementally refactor bash", "Leave it alone"],
+    "chosen_option": "Rewrite in Python",
+    "decided_on": "2025-03-05",
+    "stakes": "high",
+    "reversibility": "one_way"
+  },
+  "forecasts": [
+    { "question": "Rewrite ships without a production incident", "probability": 0.5, "desired": true, "outcome": false }
+  ],
+  "outcome": {
+    "summary": "A missed edge case in the rewrite caused a bad prod deploy in week two.",
+    "failures": [
+      { "description": "Missed edge case from the original bash script caused a bad deploy", "was_knowable": true }
+    ]
+  },
+  "human_labels": {
+    "judge_scores": { "risk_comprehensiveness": 1, "calibration_given_knowable": 5, "process_quality": 2 },
+    "score_rationales": {
+      "risk_comprehensiveness": "No mention at all of edge-case parity risk despite an 800-line script implying many: 1.",
+      "calibration_given_knowable": "50/50 honestly reflects a coin-flip level of uncertainty going in: 5.",
+      "process_quality": "One-way door taken with no rollback plan and no staged rollout: 2."
+    },
+    "expected_premortem_risks": ["An undocumented edge case in the legacy script gets dropped in the rewrite"]
+  }
+}

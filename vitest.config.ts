@@ -8,9 +8,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
-    // playwright owns e2e/, db-tests/ needs a live supabase (see test:db) —
-    // keep both out of the default vitest test.include net
-    exclude: [...configDefaults.exclude, "e2e/**", "db-tests/**"],
+    // playwright owns e2e/, db-tests/ needs a live supabase (see test:db),
+    // eval-smoke/ has its own runner (see test:eval:smoke, T44) — keep all
+    // three out of the default vitest test.include net
+    exclude: [...configDefaults.exclude, "e2e/**", "db-tests/**", "eval-smoke/**"],
   },
   resolve: {
     alias: {

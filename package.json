@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:db": "vitest run -c vitest.config.db.ts",
+    "eval:smoke": "vitest run -c vitest.config.smoke.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
     "db:seed": "node scripts/seed.mjs",

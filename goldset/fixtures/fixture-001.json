@@ -1,0 +1,32 @@
+{
+  "id": "gs-fixture-a",
+  "_note": "T44 CI smoke fixture — mocked judge scores exact match (diff 0 all dims), see eval-smoke/smoke.test.ts",
+  "decision": {
+    "title": "Adopt a monorepo vs keep separate repos",
+    "context": "Two services share a growing amount of copy-pasted utility code and version drift between them causes recurring bugs.",
+    "rationale": "Monorepo removes the drift at the cost of a heavier CI pipeline; judged worth it given the bug history.",
+    "options_considered": ["Monorepo", "Keep separate repos with a shared published package"],
+    "chosen_option": "Monorepo",
+    "decided_on": "2025-01-10",
+    "stakes": "medium",
+    "reversibility": "two_way"
+  },
+  "forecasts": [
+    { "question": "CI time increases by more than 50% within a month", "probability": 0.4, "desired": false, "outcome": true }
+  ],
+  "outcome": {
+    "summary": "CI time roughly doubled; drift bugs stopped recurring.",
+    "failures": [
+      { "description": "CI pipeline time doubled, slowing every PR", "was_knowable": true }
+    ]
+  },
+  "human_labels": {
+    "judge_scores": { "risk_comprehensiveness": 3, "calibration_given_knowable": 4, "process_quality": 4 },
+    "score_rationales": {
+      "risk_comprehensiveness": "CI cost was named but not sized: 3.",
+      "calibration_given_knowable": "0.4 tracks the stated tradeoff reasonably: 4.",
+      "process_quality": "Two real options, clear tradeoff, no kill criterion: 4."
+    },
+    "expected_premortem_risks": ["CI pipeline slows down enough to hurt iteration speed"]
+  }
+}
