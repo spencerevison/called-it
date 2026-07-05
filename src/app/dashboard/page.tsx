@@ -104,6 +104,66 @@ export default async function DashboardPage() {
           />
         </div>
       </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium">Behavior</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <BiasCard
+            label="Granularity"
+            sufficient={metrics.granularity.n > 0}
+            insufficientNote="No forecasts yet."
+            sentence={
+              metrics.granularity.n > 0
+                ? `${(metrics.granularity.round10Rate! * 100).toFixed(0)}% of your forecasts land on a round 10 (${(metrics.granularity.round5Rate! * 100).toFixed(0)}% within a round 5), ${(metrics.granularity.fiftyRate! * 100).toFixed(0)}% at exactly 50/50.`
+                : undefined
+            }
+          />
+          <BiasCard
+            label="Horizon gap"
+            sufficient={metrics.horizonGap.sufficient}
+            insufficientNote={`Insufficient data — needs ${metrics.horizonGap.minNPerSide} per side, have ${metrics.horizonGap.shortN} short / ${metrics.horizonGap.longN} long.`}
+            sentence={
+              metrics.horizonGap.sufficient
+                ? `Your long-horizon forecasts are ${metrics.horizonGap.value!.toFixed(2)} worse (Brier) than your short-horizon ones.`
+                : undefined
+            }
+          />
+          <BiasCard
+            label="Options considered"
+            sufficient={metrics.optionsConsidered.n > 0}
+            insufficientNote="No committed decisions yet."
+            sentence={
+              metrics.optionsConsidered.n > 0
+                ? `You consider ${metrics.optionsConsidered.value!.toFixed(1)} options on average before committing.`
+                : undefined
+            }
+          />
+          <BiasCard
+            label="Reversal rate"
+            sufficient={metrics.reversal.n > 0}
+            insufficientNote="No committed decisions yet."
+            sentence={
+              metrics.reversal.n > 0
+                ? `${(metrics.reversal.value! * 100).toFixed(0)}% of your committed decisions get reversed${
+                    metrics.reversal.medianDaysToReversal !== null
+                      ? `, typically within ${metrics.reversal.medianDaysToReversal.toFixed(0)} days`
+                      : ""
+                  }.`
+                : undefined
+            }
+          />
+          <BiasCard
+            label="Pre-mortem surface rate"
+            sufficient={metrics.premortemSurface.perFailure.n > 0}
+            insufficientNote="No knowable failures yet."
+            sentence={
+              metrics.premortemSurface.perFailure.n > 0
+                ? `Your pre-mortem flagged ${(metrics.premortemSurface.perFailure.value! * 100).toFixed(0)}% of knowable failures (at least one flagged in ${(metrics.premortemSurface.perDecision.value! * 100).toFixed(0)}% of those decisions).`
+                : undefined
+            }
+          />
+        </div>
+      </section>
     </main>
   );
 }
