@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { sendDueNotification } from "./due-notification";
 
 type ServiceClient = SupabaseClient<Database>;
 
@@ -13,8 +14,13 @@ export async function reconcileDueCheckins(
     .update({ status: "due" })
     .eq("status", "pending")
     .lt("scheduled_for", new Date().toISOString())
-    .select("id");
+    .select("id, decision_id, user_id");
 
   if (error) throw new Error(`checkin reconcile failed: ${error.message}`);
+
+  for (const row of data ?? []) {
+    await sendDueNotification(client, row.id, row.decision_id, row.user_id);
+  }
+
   return { updated: data?.length ?? 0 };
 }

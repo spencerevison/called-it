@@ -1,7 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { reconcileDueCheckins } from "./reconcile-handler";
+import { sendDueNotification } from "./due-notification";
 
-function buildClient(opts: { rows?: { id: string }[]; error?: boolean } = {}) {
+vi.mock("./due-notification", () => ({ sendDueNotification: vi.fn() }));
+
+function buildClient(opts: { rows?: { id: string; decision_id: string; user_id: string }[]; error?: boolean } = {}) {
   const eqCalls: [string, unknown][] = [];
   const ltCalls: [string, unknown][] = [];
 
@@ -32,9 +35,16 @@ function buildClient(opts: { rows?: { id: string }[]; error?: boolean } = {}) {
 }
 
 describe("reconcileDueCheckins", () => {
+  beforeEach(() => {
+    vi.mocked(sendDueNotification).mockClear();
+  });
+
   it("marks overdue pending rows due and reports the count", async () => {
     const { client, update, eqCalls, ltCalls } = buildClient({
-      rows: [{ id: "c1" }, { id: "c2" }],
+      rows: [
+        { id: "c1", decision_id: "d1", user_id: "u1" },
+        { id: "c2", decision_id: "d2", user_id: "u2" },
+      ],
     });
 
     const result = await reconcileDueCheckins(client);
@@ -44,6 +54,9 @@ describe("reconcileDueCheckins", () => {
     expect(eqCalls).toEqual([["status", "pending"]]);
     expect(ltCalls).toHaveLength(1);
     expect(ltCalls[0][0]).toBe("scheduled_for");
+    expect(sendDueNotification).toHaveBeenCalledTimes(2);
+    expect(sendDueNotification).toHaveBeenNthCalledWith(1, client, "c1", "d1", "u1");
+    expect(sendDueNotification).toHaveBeenNthCalledWith(2, client, "c2", "d2", "u2");
   });
 
   it("is a no-op scan when nothing is overdue (idempotent re-run)", async () => {

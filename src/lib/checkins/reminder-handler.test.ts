@@ -1,5 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { wakeCheckinReminder } from "./reminder-handler";
+import { sendDueNotification } from "./due-notification";
+
+vi.mock("./due-notification", () => ({ sendDueNotification: vi.fn() }));
 
 type Row = { status: string; trigger_run_id: string | null } | null;
 
@@ -23,7 +26,11 @@ function buildClient(rows: Row[], opts: { selectError?: boolean; updateError?: b
       return updateBuilder;
     }),
     select: vi.fn(async () => ({
-      data: opts.updateError ? null : opts.noRowsMatched ? [] : [{ id: "c1" }],
+      data: opts.updateError
+        ? null
+        : opts.noRowsMatched
+          ? []
+          : [{ id: "c1", decision_id: "d1", user_id: "u1" }],
       error: opts.updateError ? { message: "boom" } : null,
     })),
   };
@@ -42,6 +49,10 @@ function buildClient(rows: Row[], opts: { selectError?: boolean; updateError?: b
 }
 
 describe("wakeCheckinReminder", () => {
+  beforeEach(() => {
+    vi.mocked(sendDueNotification).mockClear();
+  });
+
   it("marks the row due when pending and the run id matches", async () => {
     const { client, update, updateEqCalls } = buildClient([{ status: "pending", trigger_run_id: "run_1" }]);
     const result = await wakeCheckinReminder(client, "c1", "run_1");
@@ -52,6 +63,7 @@ describe("wakeCheckinReminder", () => {
       ["status", "pending"],
       ["trigger_run_id", "run_1"],
     ]);
+    expect(sendDueNotification).toHaveBeenCalledWith(client, "c1", "d1", "u1");
   });
 
   it("noops when the row's trigger_run_id doesn't match this run (stale/rescheduled)", async () => {
@@ -92,6 +104,7 @@ describe("wakeCheckinReminder", () => {
     const { client } = buildClient([{ status: "pending", trigger_run_id: "run_1" }], { noRowsMatched: true });
     const result = await wakeCheckinReminder(client, "c1", "run_1");
     expect(result).toEqual({ updated: false });
+    expect(sendDueNotification).not.toHaveBeenCalled();
   });
 
   it("retries once when trigger_run_id is still null (schedule.ts's run-id write hasn't landed yet)", async () => {

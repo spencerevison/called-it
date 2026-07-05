@@ -47,7 +47,7 @@ One task per loop iteration. Tags: `[risk:high|low|math]` = drives the review ga
 - [x] T29 [risk:high]: Trigger.dev setup (verify current SDK major against docs before scaffolding; note the version in PROGRESS) + `checkinReminder(checkinId)` task using `wait.until({ date: scheduled_for })`; on wake re-fetch row and self-noop unless `status=pending` AND the row's `trigger_run_id` matches this run (guards early-fire on reschedule); else set status=due; store run id on the row. — AC: unit-tested via extracted handler logic with mocked client; task file matches the current Trigger.dev SDK API. — WATCH: fat task; run whole at the raised turn cap, split only on capability failure (not turn-budget failure).
 - [x] T30 [risk:high]: Daily reconciliation cron task: `pending` rows with `scheduled_for < now()` → due. — AC: idempotent; covered by handler-logic test.
 - [x] T31 [risk:low]: Due inbox: app-wide badge count + `/due` list linking into check-in flow. — AC: count matches due rows; empty state present.
-- [ ] T32 [DEFER] [risk:high]: Email notification on due (Resend), one per transition. — AC: template renders decision title + link; no duplicate sends on cron re-runs.
+- [x] T32 [DEFER] [risk:high]: Email notification on due (Resend), one per transition. — AC: template renders decision title + link; no duplicate sends on cron re-runs.
 
 > **QUALITY GATE — P4:** Fable reviews the cumulative diff since the last gate. (Details: CLAUDE.md.)
 

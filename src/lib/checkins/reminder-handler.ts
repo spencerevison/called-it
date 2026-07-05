@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { sendDueNotification } from "./due-notification";
 
 type ServiceClient = SupabaseClient<Database>;
 
@@ -50,7 +51,12 @@ export async function wakeCheckinReminder(
     .eq("id", checkinId)
     .eq("status", "pending")
     .eq("trigger_run_id", runId)
-    .select("id");
+    .select("id, decision_id, user_id");
+
+  const flipped = updated?.[0];
+  if (!updateError && flipped) {
+    await sendDueNotification(client, flipped.id, flipped.decision_id, flipped.user_id);
+  }
 
   return { updated: !updateError && Boolean(updated?.length) };
 }
