@@ -67,6 +67,10 @@ content hash changed, so it's safe to re-run after editing a prompt file.
 pnpm dev                  # http://localhost:3000
 ```
 
+> Use **`localhost:3000`**, not `127.0.0.1:3000`. Next dev canonicalizes redirects
+> to `localhost`, and Supabase's `site_url` is set to match — mixing the two hosts
+> drops the auth-session cookie and the magic link will bounce you back to login.
+
 Sign in as the seeded user (`seed@calledit.local`) via magic link — the email is
 caught by Mailpit at http://127.0.0.1:54324, click the link there. Logging a decision
 triggers the pre-mortem (if `ANTHROPIC_API_KEY` is set); committing it runs the
