@@ -16,7 +16,8 @@
     "db:seed": "node scripts/seed.mjs",
     "db:register-prompts": "node scripts/register-prompts.mjs",
     "eval:import": "node scripts/eval-import.mjs",
-    "eval:judge": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-judge.mjs"
+    "eval:judge": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-judge.mjs",
+    "eval:premortem": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-premortem.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",
