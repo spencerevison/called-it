@@ -92,6 +92,6 @@ One task per loop iteration. Tags: `[risk:high|low|math]` = drives the review ga
 ## P9 · Ship
 
 - [x] T51 [risk:low]: README: what/why, architecture + the four ADRs summarized, eval methodology + the eval table (from eval_runs), metrics glossary (one line each), honest build note ("built with Claude Code against a written spec; hand-verified: the METRICS.md test vectors and the eval gold-set labels"), local setup. — AC: a stranger can run it locally from the README alone.
-- [ ] T52 [risk:low]: A11y + polish pass on all forms/flows: labels, focus order, error announcements; visual pass against frontend-design baseline. — AC: axe run on core pages clean of serious/critical.
+- [x] T52 [risk:low]: A11y + polish pass on all forms/flows: labels, focus order, error announcements; visual pass against frontend-design baseline. — AC: axe run on core pages clean of serious/critical.
 - [ ] T53 [risk:high]: Vercel deploy (envs documented), Trigger.dev deployed, Langfuse verified in prod. — AC: production URL live end-to-end with a real decision entry.
 - [ ] T54 [DEFER] [risk:low]: Record the 60s demo per EVAL_PLAN §6. — AC: link in README.

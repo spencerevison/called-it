@@ -180,6 +180,9 @@ function FailureForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const descId = useId();
+  const riskId = useId();
+  const attributionId = useId();
+  const errorId = useId();
 
   function submit() {
     startTransition(async () => {
@@ -223,7 +226,11 @@ function FailureForm({
         className="w-full rounded-md border border-border bg-background p-2 text-sm"
       />
 
+      <label htmlFor={riskId} className="text-xs text-muted-foreground">
+        Linked risk
+      </label>
       <select
+        id={riskId}
         value={linkedRiskId}
         onChange={(e) => setLinkedRiskId(e.target.value)}
         className="w-full rounded-md border border-border bg-background p-1 text-sm"
@@ -241,7 +248,11 @@ function FailureForm({
         Knowable at decision time
       </label>
 
+      <label htmlFor={attributionId} className="text-xs text-muted-foreground">
+        Attribution
+      </label>
       <select
+        id={attributionId}
         value={attribution}
         onChange={(e) => setAttribution(e.target.value as Attribution)}
         className="w-full rounded-md border border-border bg-background p-1 text-sm"
@@ -255,11 +266,16 @@ function FailureForm({
         type="button"
         onClick={submit}
         disabled={isPending || !description.trim()}
+        aria-describedby={error ? errorId : undefined}
         className="rounded-md border border-border px-3 py-1 text-sm"
       >
         Add failure
       </button>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {error ? (
+        <p id={errorId} role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -268,6 +284,8 @@ function CompleteForm({ checkinId, onCompleted }: { checkinId: string; onComplet
   const [attribution, setAttribution] = useState<Attribution>("skill");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const attributionId = useId();
+  const errorId = useId();
 
   function submit() {
     startTransition(async () => {
@@ -285,7 +303,11 @@ function CompleteForm({ checkinId, onCompleted }: { checkinId: string; onComplet
 
   return (
     <div className="space-y-2">
+      <label htmlFor={attributionId} className="text-xs text-muted-foreground">
+        Overall attribution
+      </label>
       <select
+        id={attributionId}
         value={attribution}
         onChange={(e) => setAttribution(e.target.value as Attribution)}
         className="w-full max-w-xs rounded-md border border-border bg-background p-1 text-sm"
@@ -298,11 +320,16 @@ function CompleteForm({ checkinId, onCompleted }: { checkinId: string; onComplet
         type="button"
         onClick={submit}
         disabled={isPending}
+        aria-describedby={error ? errorId : undefined}
         className="rounded-md border border-border px-3 py-1 text-sm"
       >
         Complete check-in
       </button>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {error ? (
+        <p id={errorId} role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -322,6 +349,7 @@ function ForecastRow({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const recallId = useId();
+  const errorId = useId();
 
   function submitRecall() {
     const value = Number(recalled);
@@ -389,6 +417,9 @@ function ForecastRow({
               min="0.01"
               max="0.99"
               step="0.01"
+              required
+              aria-required="true"
+              aria-describedby={error ? errorId : undefined}
               value={recalled}
               onChange={(e) => setRecalled(e.target.value)}
               className="w-24 rounded-md border border-border bg-background p-1 text-sm"
@@ -438,7 +469,11 @@ function ForecastRow({
         </div>
       )}
 
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {error ? (
+        <p id={errorId} role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      ) : null}
     </li>
   );
 }
