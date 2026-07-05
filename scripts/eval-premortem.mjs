@@ -3,7 +3,7 @@
 // against knowable failures + expected_premortem_risks, surface-rate report +
 // eval_runs row. Mirrors eval-judge.mjs's env/service-client setup.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
