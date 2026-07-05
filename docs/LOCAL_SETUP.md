@@ -38,9 +38,18 @@ Everything else degrades gracefully:
 supabase start            # boots Postgres/auth; prints the local URL + keys
 ```
 
-Copy the `API URL`, `anon key`, and `service_role key` it prints into the three
-`NEXT_PUBLIC_SUPABASE_*` / `SUPABASE_SERVICE_ROLE_KEY` slots in `.env.local`.
-Migrations in `supabase/migrations/` apply automatically on `start`.
+Copy the values it prints into `.env.local`. Newer CLI versions label the keys
+`Publishable` / `Secret` instead of `anon` / `service_role` — same slots:
+
+- `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+- `anon key` / `Publishable` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `service_role key` / `Secret` → `SUPABASE_SERVICE_ROLE_KEY`
+
+(The legacy static local JWT keys still work too, so an existing `.env.local`
+from an older `supabase start` doesn't need re-copying.) Migrations in
+`supabase/migrations/` apply automatically on `start`.
+
+Seeded login once `db:seed` has run: `seed@calledit.local` / `seed-password-1`.
 
 ```bash
 pnpm db:seed              # a demo user + a couple of decisions to click around
