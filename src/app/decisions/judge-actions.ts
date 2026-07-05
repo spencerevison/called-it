@@ -66,13 +66,15 @@ export async function runJudge(decisionId: string): Promise<void> {
       .order("created_at")
       .order("id");
 
-    // interim guard: only the legacy whole-decision premortem (option is null) is
-    // valid judge input until T58 lands chosen-option-or-null selection
-    const { data: premortem } = await service
-      .from("premortems")
-      .select("id")
-      .eq("decision_id", decisionId)
-      .is("option", null)
+    // judge input is scoped to the chosen option's premortem only (DATA_MODEL rule 3,
+    // T58) - null chosen_option is the legacy/single-option path, same as the null-option
+    // premortem, so pre-P10 decisions hash identically. Non-chosen options' premortems
+    // are retained as the decision-time record but never selected here.
+    const premortemQuery = service.from("premortems").select("id").eq("decision_id", decisionId);
+    const { data: premortem } = await (decision.chosen_option
+      ? premortemQuery.eq("option", decision.chosen_option)
+      : premortemQuery.is("option", null)
+    )
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

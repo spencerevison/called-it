@@ -8,6 +8,7 @@ const latestPremortemMaybeSingle = vi.fn();
 const risksSelect = vi.fn();
 const judgeScoresInsert = vi.fn();
 const premortemIsSpy = vi.fn();
+const premortemEqOptionSpy = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(() => ({
@@ -23,12 +24,17 @@ vi.mock("@/lib/supabase/service", () => ({
         };
       }
       if (table === "premortems") {
+        const terminal = () => ({ order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: latestPremortemMaybeSingle })) })) });
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               is: vi.fn((...args: unknown[]) => {
                 premortemIsSpy(...args);
-                return { order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: latestPremortemMaybeSingle })) })) };
+                return terminal();
+              }),
+              eq: vi.fn((...args: unknown[]) => {
+                premortemEqOptionSpy(...args);
+                return terminal();
               }),
             })),
           })),
@@ -130,6 +136,7 @@ describe("runJudge", () => {
     judgeScoresInsert.mockReset();
     generateJudgeScores.mockReset();
     premortemIsSpy.mockReset();
+    premortemEqOptionSpy.mockReset();
     hasAnthropicKey.mockReturnValue(true);
 
     decisionFetchSingle.mockResolvedValue({ data: activeDecision(), error: null });
@@ -145,7 +152,19 @@ describe("runJudge", () => {
     expect(decisionFetchSingle).not.toHaveBeenCalled();
   });
 
-  it("scopes the premortem lookup to option = null (interim guard, see REVIEW.md)", async () => {
+  it("scopes the premortem lookup to the chosen option (T58)", async () => {
+    risksSelect.mockResolvedValue({ data: [] });
+    generateJudgeScores.mockResolvedValue(validScores());
+
+    const { runJudge } = await import("./judge-actions");
+    await runJudge("d1");
+
+    expect(premortemEqOptionSpy).toHaveBeenCalledWith("option", "a");
+    expect(premortemIsSpy).not.toHaveBeenCalled();
+  });
+
+  it("treats a null chosen_option as the legacy/single-option path (option = null)", async () => {
+    decisionFetchSingle.mockResolvedValue({ data: activeDecision({ chosen_option: null }), error: null });
     risksSelect.mockResolvedValue({ data: [] });
     generateJudgeScores.mockResolvedValue(validScores());
 
@@ -153,6 +172,7 @@ describe("runJudge", () => {
     await runJudge("d1");
 
     expect(premortemIsSpy).toHaveBeenCalledWith("option", null);
+    expect(premortemEqOptionSpy).not.toHaveBeenCalled();
   });
 
   it("persists judge_scores on a clean scoring pass", async () => {
