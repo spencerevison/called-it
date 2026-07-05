@@ -49,7 +49,9 @@ Copy the values it prints into `.env.local`. Newer CLI versions label the keys
 from an older `supabase start` doesn't need re-copying.) Migrations in
 `supabase/migrations/` apply automatically on `start`.
 
-Seeded login once `db:seed` has run: `seed@calledit.local` / `seed-password-1`.
+Seeded user once `db:seed` has run: `seed@calledit.local`. Auth is magic-link —
+enter that email, click **Send magic link**, then open Mailpit
+(http://127.0.0.1:54324) and click the link in the caught email to sign in.
 
 ```bash
 pnpm db:seed              # a demo user + a couple of decisions to click around
@@ -65,7 +67,8 @@ content hash changed, so it's safe to re-run after editing a prompt file.
 pnpm dev                  # http://localhost:3000
 ```
 
-Log in with the seeded credentials printed by `db:seed`. Logging a decision
+Sign in as the seeded user (`seed@calledit.local`) via magic link — the email is
+caught by Mailpit at http://127.0.0.1:54324, click the link there. Logging a decision
 triggers the pre-mortem (if `ANTHROPIC_API_KEY` is set); committing it runs the
 judge.
 
