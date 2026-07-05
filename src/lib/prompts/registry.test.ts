@@ -49,6 +49,15 @@ describe("parsePromptHeader", () => {
     const b = parsePromptHeader(PREMORTEM.replace("body here", "different body"), "b.md");
     expect(a.contentHash).not.toBe(b.contentHash);
   });
+
+  it("defaults excluded to false when no registry line is present", () => {
+    expect(parsePromptHeader(PREMORTEM, "prompts/premortem_v1.md").excluded).toBe(false);
+  });
+
+  it("parses `registry: excluded` as excluded", () => {
+    const aware = `# judge_v1_aware\n\nkind: judge\nmodel: claude-sonnet-5\nregistry: excluded\n\n---SYSTEM---\nbody\n`;
+    expect(parsePromptHeader(aware, "prompts/judge_v1_aware.md").excluded).toBe(true);
+  });
 });
 
 describe("planPromptRegistration", () => {
@@ -66,5 +75,11 @@ describe("planPromptRegistration", () => {
   it("throws PromptDriftError when the file changed under a registered id", () => {
     const existing = [{ id: "premortem_v1", contentHash: "stale-hash" }];
     expect(() => planPromptRegistration(parsed, existing)).toThrow(PromptDriftError);
+  });
+
+  it("never queues an excluded prompt, even when brand new", () => {
+    const aware = `# judge_v1_aware\n\nkind: judge\nmodel: claude-sonnet-5\nregistry: excluded\n\n---SYSTEM---\nbody\n`;
+    const parsedAware = [parsePromptHeader(aware, "prompts/judge_v1_aware.md")];
+    expect(planPromptRegistration(parsedAware, [])).toEqual([]);
   });
 });

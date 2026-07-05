@@ -11,6 +11,7 @@ export type ParsedPrompt = {
   filePath: string;
   contentHash: string;
   notes: string | null;
+  excluded: boolean;
 };
 
 export type ExistingPromptVersion = {
@@ -36,6 +37,9 @@ export function parsePromptHeader(raw: string, filePath: string): ParsedPrompt {
     throw new Error(`${filePath}: missing "kind:" header line`);
   }
   const notesMatch = header.match(/^notes:\s*(.+)$/m);
+  // T45 — a prompt marked `registry: excluded` (the contamination variant) is
+  // parsed like any other file but never queued for insert, see planPromptRegistration.
+  const excludedMatch = header.match(/^registry:\s*excluded\s*$/m);
 
   return {
     id: idMatch[1].trim(),
@@ -43,6 +47,7 @@ export function parsePromptHeader(raw: string, filePath: string): ParsedPrompt {
     filePath,
     contentHash: createHash("sha256").update(raw).digest("hex"),
     notes: notesMatch ? notesMatch[1].trim() : null,
+    excluded: excludedMatch !== null,
   };
 }
 
@@ -58,6 +63,8 @@ export function planPromptRegistration(
   const inserts: ParsedPrompt[] = [];
 
   for (const prompt of parsed) {
+    if (prompt.excluded) continue;
+
     const registeredHash = existingById.get(prompt.id);
     if (registeredHash === undefined) {
       inserts.push(prompt);

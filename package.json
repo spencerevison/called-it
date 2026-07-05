@@ -19,7 +19,8 @@
     "eval:import": "node scripts/eval-import.mjs",
     "eval:judge": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-judge.mjs",
     "eval:premortem": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-premortem.mjs",
-    "eval:compare": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-compare.mjs"
+    "eval:compare": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-compare.mjs",
+    "eval:contamination": "node --import ./scripts/ts-alias-loader.mjs scripts/eval-contamination.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",

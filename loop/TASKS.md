@@ -77,7 +77,7 @@ One task per loop iteration. Tags: `[risk:high|low|math]` = drives the review ga
 - [x] T42 [risk:low]: `pnpm eval:premortem --version <v>` — generate per item, assisted-manual matching CLI (persisted matches keyed per EVAL_PLAN §2), surface-rate report + `eval_runs` row. — AC: matching session resumable; re-run same version reuses matches without prompting.
 - [x] T43 [risk:low]: `pnpm eval:compare --kind premortem v1 v2` — delta table (surface rate, mean risks, cost/item, p50 latency from Langfuse) → report + `eval_runs`. — AC: renders with mocked Langfuse data in tests.
 - [x] T44 [risk:low]: CI eval smoke: 3 fixtures + deterministic mocked LLM through import→judge→report. — AC: separate `pnpm eval:smoke` script + CI job (not part of `pnpm check`); runs against the in-memory store; zero live calls (assert fetch-mock).
-- [ ] T45 [DEFER] [risk:low]: `pnpm eval:contamination` — outcome-aware judge variant prompt (derived from judge_v1 + outcome section) vs blind, per EVAL_PLAN; delta-by-outcome-valence report. — AC: variant prompt committed as `prompts/judge_v1_aware.md`, excluded from the in-app registry.
+- [x] T45 [DEFER] [risk:low]: `pnpm eval:contamination` — outcome-aware judge variant prompt (derived from judge_v1 + outcome section) vs blind, per EVAL_PLAN; delta-by-outcome-valence report. — AC: variant prompt committed as `prompts/judge_v1_aware.md`, excluded from the in-app registry.
 
 > **QUALITY GATE — P7:** Fable reviews the cumulative diff since the last gate. (Details: CLAUDE.md.)
 
