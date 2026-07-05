@@ -66,10 +66,13 @@ export async function runJudge(decisionId: string): Promise<void> {
       .order("created_at")
       .order("id");
 
+    // interim guard: only the legacy whole-decision premortem (option is null) is
+    // valid judge input until T58 lands chosen-option-or-null selection
     const { data: premortem } = await service
       .from("premortems")
       .select("id")
       .eq("decision_id", decisionId)
+      .is("option", null)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

@@ -289,12 +289,32 @@ describe("generatePremortem", () => {
     });
     premortemInsertSingle.mockResolvedValue({ data: { id: "pm1" }, error: null });
 
+    const { renderTemplate } = await import("@/lib/prompts/template");
     const { generatePremortem } = await import("./premortem-actions");
     const result = await generatePremortem("d1", "b");
 
     expect(result).toEqual({ ok: true, id: "pm1" });
     // scoped lookup for the previous premortem uses this option, not the legacy null slot
     expect(premortemsEq).toHaveBeenCalledWith("option", "b");
+    // the actual behavior under test: the render context carries the override, not the decision's own chosen_option
+    expect(renderTemplate).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ chosen_option: "b" }));
+  });
+
+  it("uses the decision's own chosen_option in the render context when no option is given", async () => {
+    decisionFetchSingle.mockResolvedValue({ data: draftDecision({ chosen_option: "a" }), error: null });
+    generatePremortemRisks.mockResolvedValue({
+      ok: true,
+      risks: [{ description: "r", category: "execution", severity: "medium", likelihood: 0.3 }],
+    });
+    premortemInsertSingle.mockResolvedValue({ data: { id: "pm1" }, error: null });
+    latestPremortemMaybeSingle.mockResolvedValue({ data: null });
+    userRisksSelect.mockResolvedValue({ data: [] });
+
+    const { renderTemplate } = await import("@/lib/prompts/template");
+    const { generatePremortem } = await import("./premortem-actions");
+    await generatePremortem("d1");
+
+    expect(renderTemplate).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ chosen_option: "a" }));
   });
 
   it("scopes carry-forward and the previous-premortem lookup to the same option only, on regenerate", async () => {

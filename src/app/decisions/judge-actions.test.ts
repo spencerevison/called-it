@@ -7,6 +7,7 @@ const forecastsSelect = vi.fn();
 const latestPremortemMaybeSingle = vi.fn();
 const risksSelect = vi.fn();
 const judgeScoresInsert = vi.fn();
+const premortemIsSpy = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(() => ({
@@ -24,7 +25,12 @@ vi.mock("@/lib/supabase/service", () => ({
       if (table === "premortems") {
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({ order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: latestPremortemMaybeSingle })) })) })),
+            eq: vi.fn(() => ({
+              is: vi.fn((...args: unknown[]) => {
+                premortemIsSpy(...args);
+                return { order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: latestPremortemMaybeSingle })) })) };
+              }),
+            })),
           })),
         };
       }
@@ -123,6 +129,7 @@ describe("runJudge", () => {
     risksSelect.mockReset();
     judgeScoresInsert.mockReset();
     generateJudgeScores.mockReset();
+    premortemIsSpy.mockReset();
     hasAnthropicKey.mockReturnValue(true);
 
     decisionFetchSingle.mockResolvedValue({ data: activeDecision(), error: null });
@@ -136,6 +143,16 @@ describe("runJudge", () => {
     const { runJudge } = await import("./judge-actions");
     await runJudge("d1");
     expect(decisionFetchSingle).not.toHaveBeenCalled();
+  });
+
+  it("scopes the premortem lookup to option = null (interim guard, see REVIEW.md)", async () => {
+    risksSelect.mockResolvedValue({ data: [] });
+    generateJudgeScores.mockResolvedValue(validScores());
+
+    const { runJudge } = await import("./judge-actions");
+    await runJudge("d1");
+
+    expect(premortemIsSpy).toHaveBeenCalledWith("option", null);
   });
 
   it("persists judge_scores on a clean scoring pass", async () => {
