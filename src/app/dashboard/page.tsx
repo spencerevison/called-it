@@ -3,6 +3,11 @@ import { createSupabaseMetricsFetcher } from "@/lib/metrics/supabase-fetcher";
 import { getDashboardMetrics } from "@/lib/metrics/aggregate";
 import { CalibrationChart, BrierTrendChart } from "./charts";
 
+// ponytail: plain string helper, not worth a component — every panel needs the same "n of minN" framing
+function unlockNote(n: number, minN: number, unit: string) {
+  return `Unlocks at ${minN} ${unit} — you have ${n}.`;
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -28,6 +33,21 @@ export default async function DashboardPage() {
   const resolvedCount = resolved.count ?? 0;
   const openCheckins = (pending.count ?? 0) + (due.count ?? 0);
 
+  if (decisionCount === 0) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
+        <h1 className="text-lg font-semibold">Dashboard</h1>
+        <div className="rounded-md border border-border bg-surface p-6 space-y-2">
+          <p className="text-sm font-medium">Nothing to show yet — that&apos;s expected.</p>
+          <p className="text-sm text-muted-foreground">
+            Record your first decision to start the clock. Calibration and bias charts unlock after 5 resolved
+            forecasts; the behavior panel unlocks as soon as you have committed decisions and check-ins.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
       <h1 className="text-lg font-semibold">Dashboard</h1>
@@ -42,7 +62,7 @@ export default async function DashboardPage() {
           sentence={
             metrics.brier.sufficient
               ? "Lower is better — 0.25 is a coin flip, 0 is perfect."
-              : `Insufficient data — needs ${metrics.brier.minN}, have ${metrics.brier.n}.`
+              : unlockNote(metrics.brier.n, metrics.brier.minN, "resolved forecasts")
           }
         />
       </div>
@@ -62,7 +82,7 @@ export default async function DashboardPage() {
             <BrierTrendChart points={metrics.brierTrend.value!} />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Insufficient data — needs {metrics.brierTrend.minN}, have {metrics.brierTrend.n}.
+              {unlockNote(metrics.brierTrend.n, metrics.brierTrend.minN, "resolved forecasts")}
             </p>
           )}
           <p className="text-xs text-muted-foreground">Rolling Brier score over a trailing 90-day window.</p>
@@ -75,7 +95,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Hindsight"
             sufficient={metrics.hindsightBias.sufficient}
-            insufficientNote={`Insufficient data — needs ${metrics.hindsightBias.minN}, have ${metrics.hindsightBias.n}.`}
+            insufficientNote={unlockNote(metrics.hindsightBias.n, metrics.hindsightBias.minN, "recalled forecasts")}
             sentence={
               metrics.hindsightBias.sufficient
                 ? `Your memory shifts ${metrics.hindsightBias.value!.toFixed(2)} points toward the outcome after the fact.`
@@ -85,7 +105,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Optimism"
             sufficient={metrics.optimismBias.desired.sufficient}
-            insufficientNote={`Insufficient data — needs ${metrics.optimismBias.desired.minN} desired forecasts, have ${metrics.optimismBias.desired.n}.`}
+            insufficientNote={unlockNote(metrics.optimismBias.desired.n, metrics.optimismBias.desired.minN, "desired forecasts")}
             sentence={
               metrics.optimismBias.desired.sufficient
                 ? `You overestimate wanted outcomes by ${metrics.optimismBias.desired.value!.toFixed(2)} (control: ${metrics.optimismBias.control.value === null ? "—" : metrics.optimismBias.control.value.toFixed(2)}).`
@@ -95,7 +115,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Self-serving"
             sufficient={metrics.selfServing.sufficient}
-            insufficientNote={`Insufficient data — needs ${metrics.selfServing.minNPerSide} per side, have ${metrics.selfServing.goodN} good / ${metrics.selfServing.badN} bad.`}
+            insufficientNote={`Unlocks at ${metrics.selfServing.minNPerSide} good + ${metrics.selfServing.minNPerSide} bad check-ins — you have ${metrics.selfServing.goodN} good / ${metrics.selfServing.badN} bad.`}
             sentence={
               metrics.selfServing.sufficient
                 ? `You credit skill for wins ${metrics.selfServing.value!.toFixed(2)} more often than for losses.`
@@ -111,7 +131,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Granularity"
             sufficient={metrics.granularity.n > 0}
-            insufficientNote="No forecasts yet."
+            insufficientNote="Unlocks at your first forecast."
             sentence={
               metrics.granularity.n > 0
                 ? `${(metrics.granularity.round10Rate! * 100).toFixed(0)}% of your forecasts land on a round 10 (${(metrics.granularity.round5Rate! * 100).toFixed(0)}% within a round 5), ${(metrics.granularity.fiftyRate! * 100).toFixed(0)}% at exactly 50/50.`
@@ -121,7 +141,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Horizon gap"
             sufficient={metrics.horizonGap.sufficient}
-            insufficientNote={`Insufficient data — needs ${metrics.horizonGap.minNPerSide} per side, have ${metrics.horizonGap.shortN} short / ${metrics.horizonGap.longN} long.`}
+            insufficientNote={`Unlocks at ${metrics.horizonGap.minNPerSide} per side — you have ${metrics.horizonGap.shortN} short / ${metrics.horizonGap.longN} long.`}
             sentence={
               metrics.horizonGap.sufficient
                 ? `Your long-horizon forecasts are ${metrics.horizonGap.value!.toFixed(2)} worse (Brier) than your short-horizon ones.`
@@ -131,7 +151,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Options considered"
             sufficient={metrics.optionsConsidered.n > 0}
-            insufficientNote="No committed decisions yet."
+            insufficientNote="Unlocks at your first committed decision."
             sentence={
               metrics.optionsConsidered.n > 0
                 ? `You consider ${metrics.optionsConsidered.value!.toFixed(1)} options on average before committing.`
@@ -141,7 +161,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Reversal rate"
             sufficient={metrics.reversal.n > 0}
-            insufficientNote="No committed decisions yet."
+            insufficientNote="Unlocks at your first committed decision."
             sentence={
               metrics.reversal.n > 0
                 ? `${(metrics.reversal.value! * 100).toFixed(0)}% of your committed decisions get reversed${
@@ -155,7 +175,7 @@ export default async function DashboardPage() {
           <BiasCard
             label="Pre-mortem surface rate"
             sufficient={metrics.premortemSurface.perFailure.n > 0}
-            insufficientNote="No knowable failures yet."
+            insufficientNote="Unlocks once a check-in flags a knowable failure."
             sentence={
               metrics.premortemSurface.perFailure.n > 0
                 ? `Your pre-mortem flagged ${(metrics.premortemSurface.perFailure.value! * 100).toFixed(0)}% of knowable failures (at least one flagged in ${(metrics.premortemSurface.perDecision.value! * 100).toFixed(0)}% of those decisions).`

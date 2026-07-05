@@ -87,7 +87,7 @@ One task per loop iteration. Tags: `[risk:high|low|math]` = drives the review ga
 - [x] T47 [risk:low] (deps: T20): Calibration curve chart (perfect-calibration diagonal, bin dots sized by n, n<5 greyed) + Brier trend (rolling). — AC: renders from seed; keyboard-focusable tooltips.
 - [x] T48 [risk:low] (deps: T20): Bias panel: hindsight (M3), optimism (M4 with control line), self-serving (M9) — each with its plain-language sentence per METRICS.md display rule. — AC: sentences render with live values interpolated; min-n fallbacks.
 - [x] T49 [risk:low] (deps: T20): Behavior panel: granularity (M5), horizon gap (M6), options count (M7), reversal (M8), surface rate (M10). — AC: same display-rule compliance.
-- [ ] T50 [risk:low]: Dashboard empty/threshold states: a new user sees what will unlock and at what n, not a wall of "insufficient data." — AC: copy reviewed against SPEC G2 intent.
+- [x] T50 [risk:low]: Dashboard empty/threshold states: a new user sees what will unlock and at what n, not a wall of "insufficient data." — AC: copy reviewed against SPEC G2 intent.
 
 ## P9 · Ship
 
