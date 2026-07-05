@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { parseGoldsetEntry } from "@/lib/eval/goldset";
-import { assembleJudgeInputFromGoldset, findDisagreements, renderJudgeReport } from "@/lib/eval/judge-run";
+import { findDisagreements, judgeEntries, renderJudgeReport } from "@/lib/eval/judge-run";
 import { computeAgreement } from "@/lib/eval/agreement";
-import { loadPromptTemplate, renderTemplate } from "@/lib/prompts/template";
+import { loadPromptTemplate } from "@/lib/prompts/template";
 
 // T44 — CI eval smoke: import -> judge -> report against 3 synthetic fixtures,
 // entirely in-memory (no DB) with the LLM call mocked (zero live calls). Mock
@@ -43,25 +43,17 @@ describe("eval smoke (T44)", () => {
       JSON.stringify({ ...MOCK_RESPONSES[call++], rationale, evidence_spans: [], contamination: false }),
     );
 
-    // judge: same assembly + scoring path as eval-judge.mjs, driven in-memory.
-    // for-of (not Promise.all) so mock call order stays pinned to fixture order.
+    // judge: drive the SAME production loop eval-judge.mjs uses, in-memory with a
+    // mocked scoreFn — so CI exercises judgeEntries itself, not a re-implemented copy.
     const template = await loadPromptTemplate("judge_v1");
-    const judged = [];
-    for (const entry of entries) {
-      const input = assembleJudgeInputFromGoldset(entry);
-      const promptContext = { ...input, options_considered: input.options_considered.join(", ") };
-      const system = renderTemplate(template.system, promptContext);
-      const user = renderTemplate(template.user, promptContext);
-      const result = await generateJudgeScores({ model: template.model, system, user });
-      if (!result.ok) throw new Error(result.error);
-      judged.push({
-        itemId: entry.id,
-        human: entry.human_labels.judge_scores,
-        humanRationale: entry.human_labels.score_rationales,
-        judge: result.scores,
-        judgeRationale: result.rationale,
-      });
-    }
+    const { judged } = await judgeEntries({
+      entries,
+      template,
+      version: "judge_v1",
+      runId: "smoke-run",
+      rubricVersion: "v1",
+      scoreFn: generateJudgeScores,
+    });
 
     // zero live calls — every score came from the mock, never a real network hit
     expect(generateText).toHaveBeenCalledTimes(3);

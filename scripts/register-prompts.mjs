@@ -7,26 +7,15 @@
 // directly (Node 22.18+ strips the .ts types natively) so there's exactly one
 // implementation and the tests cover the code this script actually runs.
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
+import { loadEnvLocal, serviceClient } from "./lib/bootstrap.mjs";
 import { parsePromptHeader, planPromptRegistration } from "../src/lib/prompts/registry.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, "..", ".env.local");
-if (existsSync(envPath)) {
-  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-    const match = line.match(/^([\w.-]+)=(.*)$/);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
-  }
-}
-
-const svc = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-);
+loadEnvLocal();
+const svc = serviceClient();
 
 async function main() {
   const promptsDir = path.resolve(__dirname, "..", "prompts");

@@ -1,4 +1,13 @@
-import { JUDGE_DIMENSIONS, type JudgeInput, type JudgeScores, type JudgeRationale } from "@/lib/llm/judge";
+import {
+  JUDGE_DIMENSIONS,
+  hashJudgeInput,
+  type JudgeInput,
+  type JudgeScores,
+  type JudgeRationale,
+  type ParsedJudgeResponse,
+} from "@/lib/llm/judge";
+import { renderTemplate, type PromptTemplate } from "@/lib/prompts/template";
+import { startTrace } from "@/lib/llm/tracing";
 import type { AgreementResult } from "@/lib/eval/agreement";
 import type { GoldsetEntry } from "@/lib/eval/goldset";
 
@@ -27,6 +36,73 @@ export function assembleJudgeInputFromGoldset(entry: GoldsetEntry): JudgeInput {
 // and latency are queryable per-run in Langfuse (traces can't be tagged after the fact).
 export function evalTraceTags(runId: string, promptVersion: string, itemId: string): string[] {
   return [`run_id:${runId}`, `prompt_version:${promptVersion}`, `item_id:${itemId}`];
+}
+
+// the run_id tag as the compare consumer queries it — same string evalTraceTags
+// emits, kept here so producer (eval-*) and consumer (eval-compare) can't drift apart.
+export function runIdTag(runId: string): string {
+  return `run_id:${runId}`;
+}
+
+export type JudgedItem = {
+  itemId: string;
+  human: JudgeScores;
+  humanRationale: JudgeRationale;
+  judge: JudgeScores;
+  judgeRationale: JudgeRationale;
+};
+
+export type JudgeScoreFn = (params: {
+  model: string;
+  system: string;
+  user: string;
+}) => Promise<ParsedJudgeResponse>;
+
+// The one judge-eval drive loop: assemble outcome-blind input, render the prompt,
+// trace, score, accumulate. eval-judge.mjs (live scoreFn) and the CI smoke test
+// (mocked scoreFn) both call this, so CI exercises the production path — not a copy
+// of it (the tested-copy/live-copy split the P6/P7 gates flagged).
+export async function judgeEntries(params: {
+  entries: GoldsetEntry[];
+  template: PromptTemplate;
+  version: string;
+  runId: string;
+  rubricVersion: string;
+  scoreFn: JudgeScoreFn;
+}): Promise<{ judged: JudgedItem[]; contaminatedItemIds: string[] }> {
+  const judged: JudgedItem[] = [];
+  const contaminatedItemIds: string[] = [];
+
+  for (const entry of params.entries) {
+    const input = assembleJudgeInputFromGoldset(entry);
+    const inputHash = hashJudgeInput(input);
+    const promptContext = { ...input, options_considered: input.options_considered.join(", ") };
+    const system = renderTemplate(params.template.system, promptContext);
+    const user = renderTemplate(params.template.user, promptContext);
+
+    const trace = startTrace({
+      name: "eval:judge",
+      input: { itemId: entry.id, inputHash },
+      promptVersion: params.version,
+      rubricVersion: params.rubricVersion,
+      tags: evalTraceTags(params.runId, params.version, entry.id),
+    });
+    const result = await params.scoreFn({ model: params.template.model, system, user });
+    trace.end(result.ok ? { scores: result.scores, contamination: result.contamination } : { error: result.error });
+
+    if (!result.ok) throw new Error(`eval:judge: item ${entry.id} failed — ${result.error}`);
+    if (result.contamination) contaminatedItemIds.push(entry.id);
+
+    judged.push({
+      itemId: entry.id,
+      human: entry.human_labels.judge_scores,
+      humanRationale: entry.human_labels.score_rationales,
+      judge: result.scores,
+      judgeRationale: result.rationale,
+    });
+  }
+
+  return { judged, contaminatedItemIds };
 }
 
 export type DisagreementCase = {

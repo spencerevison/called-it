@@ -4,35 +4,23 @@
 // docs/eval/, and an eval_runs row. Mirrors eval-import.mjs's env/service-client
 // setup and imports the unit-tested lib code directly (one impl, per T37/P6).
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { loadEnvLocal, serviceClient } from "./lib/bootstrap.mjs";
 import { parseGoldsetEntry } from "../src/lib/eval/goldset.ts";
-import { assembleJudgeInputFromGoldset, evalTraceTags, findDisagreements, renderJudgeReport } from "../src/lib/eval/judge-run.ts";
+import { findDisagreements, judgeEntries, renderJudgeReport } from "../src/lib/eval/judge-run.ts";
 import { computeAgreement } from "../src/lib/eval/agreement.ts";
-import { hashJudgeInput, generateJudgeScores } from "../src/lib/llm/judge.ts";
+import { generateJudgeScores } from "../src/lib/llm/judge.ts";
 import { hasAnthropicKey } from "../src/lib/llm/client.ts";
-import { loadPromptTemplate, renderTemplate } from "../src/lib/prompts/template.ts";
-import { startTrace } from "../src/lib/llm/tracing.ts";
+import { loadPromptTemplate } from "../src/lib/prompts/template.ts";
 
 const RUBRIC_VERSION = "v1"; // JUDGE_RUBRIC.md version, same constant as judge-actions.ts
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, "..", ".env.local");
-if (existsSync(envPath)) {
-  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-    const match = line.match(/^([\w.-]+)=(.*)$/);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
-  }
-}
-
-const svc = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-);
+loadEnvLocal();
+const svc = serviceClient();
 
 function parseArgs(argv) {
   const idx = argv.indexOf("--version");
@@ -56,43 +44,18 @@ async function main() {
   const entries = rows.map((row) => parseGoldsetEntry(JSON.stringify(row.payload), row.id));
   const template = await loadPromptTemplate(version);
   const runId = randomUUID();
-
-  const judged = [];
-  const contaminatedItemIds = [];
-  for (const entry of entries) {
-    const input = assembleJudgeInputFromGoldset(entry);
-    const inputHash = hashJudgeInput(input);
-    const promptContext = { ...input, options_considered: input.options_considered.join(", ") };
-    const system = renderTemplate(template.system, promptContext);
-    const user = renderTemplate(template.user, promptContext);
-
-    const trace = startTrace({
-      name: "eval:judge",
-      input: { itemId: entry.id, inputHash },
-      promptVersion: version,
-      rubricVersion: RUBRIC_VERSION,
-      tags: evalTraceTags(runId, version, entry.id),
-    });
-
-    const result = await generateJudgeScores({ model: template.model, system, user });
-    trace.end(result.ok ? { scores: result.scores, contamination: result.contamination } : { error: result.error });
-
-    if (!result.ok) throw new Error(`eval:judge: item ${entry.id} failed — ${result.error}`);
-
+  const { judged, contaminatedItemIds } = await judgeEntries({
+    entries,
+    template,
+    version,
+    runId,
+    rubricVersion: RUBRIC_VERSION,
+    scoreFn: generateJudgeScores,
+  });
+  for (const id of contaminatedItemIds) {
     // gold-set items are hand-written from decision-time notes (JUDGE_RUBRIC §Hand-labeling);
-    // contamination here means the entry itself leaked outcome content, not assembly.
-    if (result.contamination) {
-      console.warn(`eval:judge: item ${entry.id} flagged contamination — entry content likely leaks outcome`);
-      contaminatedItemIds.push(entry.id);
-    }
-
-    judged.push({
-      itemId: entry.id,
-      human: entry.human_labels.judge_scores,
-      humanRationale: entry.human_labels.score_rationales,
-      judge: result.scores,
-      judgeRationale: result.rationale,
-    });
+    // contamination means the entry itself leaked outcome content, not assembly.
+    console.warn(`eval:judge: item ${id} flagged contamination — entry content likely leaks outcome`);
   }
 
   const agreement = computeAgreement(judged);

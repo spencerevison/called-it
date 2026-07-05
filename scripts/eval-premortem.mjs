@@ -3,12 +3,12 @@
 // against knowable failures + expected_premortem_risks, surface-rate report +
 // eval_runs row. Mirrors eval-judge.mjs's env/service-client setup.
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
-import { createClient } from "@supabase/supabase-js";
+import { loadEnvLocal, serviceClient } from "./lib/bootstrap.mjs";
 import { parseGoldsetEntry } from "../src/lib/eval/goldset.ts";
 import {
   buildPremortemPromptContext,
@@ -18,25 +18,15 @@ import {
   computeExpectedCoverage,
   renderPremortemReport,
 } from "../src/lib/eval/premortem-run.ts";
+import { evalTraceTags } from "../src/lib/eval/judge-run.ts";
 import { generatePremortemRisks } from "../src/lib/llm/premortem.ts";
 import { hasAnthropicKey } from "../src/lib/llm/client.ts";
 import { loadPromptTemplate, renderTemplate } from "../src/lib/prompts/template.ts";
 import { startTrace } from "../src/lib/llm/tracing.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, "..", ".env.local");
-if (existsSync(envPath)) {
-  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-    const match = line.match(/^([\w.-]+)=(.*)$/);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
-  }
-}
-
-const svc = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-);
+loadEnvLocal();
+const svc = serviceClient();
 
 function parseArgs(argv) {
   const idx = argv.indexOf("--version");
@@ -100,7 +90,7 @@ async function main() {
         name: "eval:premortem",
         input: { itemId: entry.id },
         promptVersion: version,
-        tags: [`run_id:${runId}`, `prompt_version:${version}`, `item_id:${entry.id}`],
+        tags: evalTraceTags(runId, version, entry.id),
       });
 
       const result = await generatePremortemRisks({ model: template.model, system, user });

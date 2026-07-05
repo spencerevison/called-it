@@ -3,30 +3,20 @@
 // from Langfuse traces tagged run_id:<run.id> (EVAL_PLAN §2 tag contract),
 // renders a delta table, writes a content-free report + an eval_runs row.
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
 import { Langfuse } from "langfuse";
+import { loadEnvLocal, serviceClient } from "./lib/bootstrap.mjs";
 import { computeCostLatencyStats, renderCompareReport } from "../src/lib/eval/compare-run.ts";
+import { runIdTag } from "../src/lib/eval/judge-run.ts";
 
 // kind flag -> eval_runs.kind produced by that run's CLI (only premortem exists so far)
 const KIND_TO_RUN_KIND = { premortem: "premortem_surface" };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, "..", ".env.local");
-if (existsSync(envPath)) {
-  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-    const match = line.match(/^([\w.-]+)=(.*)$/);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
-  }
-}
-
-const svc = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-);
+loadEnvLocal();
+const svc = serviceClient();
 
 function parseArgs(argv) {
   const idx = argv.indexOf("--kind");
@@ -59,7 +49,7 @@ async function latestRun(runKind, version) {
 
 async function versionStats(langfuse, runKind, version) {
   const run = await latestRun(runKind, version);
-  const traces = langfuse ? (await langfuse.api.traceList({ tags: [`run_id:${run.id}`], limit: 100 })).data : [];
+  const traces = langfuse ? (await langfuse.api.traceList({ tags: [runIdTag(run.id)], limit: 100 })).data : [];
   const { costPerItem, p50LatencyMs } = computeCostLatencyStats(traces.map((t) => ({ totalCost: t.totalCost, latency: t.latency })));
 
   return {

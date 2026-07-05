@@ -29,25 +29,10 @@
 //                          per-decision 2/2=1.0
 // -----------------------------------------------------------------------------
 
-import { readFileSync, existsSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
+import { loadEnvLocal, serviceClient } from "./lib/bootstrap.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, "..", ".env.local");
-if (existsSync(envPath)) {
-  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-    const match = line.match(/^([\w.-]+)=(.*)$/);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
-  }
-}
-
-const svc = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-);
+loadEnvLocal();
+const svc = serviceClient();
 
 const SEED_EMAIL = "seed@calledit.local";
 const SEED_PASSWORD = "seed-password-1";
