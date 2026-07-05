@@ -68,7 +68,62 @@ export default async function DashboardPage() {
           <p className="text-xs text-muted-foreground">Rolling Brier score over a trailing 90-day window.</p>
         </section>
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium">Bias</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <BiasCard
+            label="Hindsight"
+            sufficient={metrics.hindsightBias.sufficient}
+            insufficientNote={`Insufficient data — needs ${metrics.hindsightBias.minN}, have ${metrics.hindsightBias.n}.`}
+            sentence={
+              metrics.hindsightBias.sufficient
+                ? `Your memory shifts ${metrics.hindsightBias.value!.toFixed(2)} points toward the outcome after the fact.`
+                : undefined
+            }
+          />
+          <BiasCard
+            label="Optimism"
+            sufficient={metrics.optimismBias.desired.sufficient}
+            insufficientNote={`Insufficient data — needs ${metrics.optimismBias.desired.minN} desired forecasts, have ${metrics.optimismBias.desired.n}.`}
+            sentence={
+              metrics.optimismBias.desired.sufficient
+                ? `You overestimate wanted outcomes by ${metrics.optimismBias.desired.value!.toFixed(2)} (control: ${metrics.optimismBias.control.value === null ? "—" : metrics.optimismBias.control.value.toFixed(2)}).`
+                : undefined
+            }
+          />
+          <BiasCard
+            label="Self-serving"
+            sufficient={metrics.selfServing.sufficient}
+            insufficientNote={`Insufficient data — needs ${metrics.selfServing.minNPerSide} per side, have ${metrics.selfServing.goodN} good / ${metrics.selfServing.badN} bad.`}
+            sentence={
+              metrics.selfServing.sufficient
+                ? `You credit skill for wins ${metrics.selfServing.value!.toFixed(2)} more often than for losses.`
+                : undefined
+            }
+          />
+        </div>
+      </section>
     </main>
+  );
+}
+
+function BiasCard({
+  label,
+  sufficient,
+  insufficientNote,
+  sentence,
+}: {
+  label: string;
+  sufficient: boolean;
+  insufficientNote: string;
+  sentence?: string;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-surface p-4 space-y-1">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm">{sufficient ? sentence : insufficientNote}</p>
+    </div>
   );
 }
 
