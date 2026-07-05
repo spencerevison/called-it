@@ -68,8 +68,9 @@ export function BrierTrendChart({ points }: { points: BrierTrendPoint[] }) {
   return (
     <svg viewBox="0 0 100 100" className="w-full max-w-sm" role="img" aria-label="Rolling Brier score trend">
       <path d={path} fill="none" stroke="var(--chart-2)" strokeWidth="1" />
-      {coords.map(({ x, y, pt }) => (
-        <g key={pt.resolvedAt} className="group" tabIndex={0} focusable="true">
+      {coords.map(({ x, y, pt }, i) => (
+        // resolvedAt isn't unique — two forecasts can resolve at the same instant
+        <g key={`${pt.resolvedAt}-${i}`} className="group" tabIndex={0} focusable="true">
           <circle cx={x} cy={y} r="2.5" fill="var(--chart-1)" stroke="var(--surface)" strokeWidth="0.5">
             <title>{`${pt.resolvedAt}: Brier ${pt.value.toFixed(3)} (trailing n=${pt.n})`}</title>
           </circle>
