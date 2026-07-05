@@ -42,11 +42,16 @@ export function PremortemPanel({
   premortemId,
   risks,
   isDraft,
+  option,
+  heading = "Pre-mortem",
 }: {
   decisionId: string;
   premortemId: string | null;
   risks: Risk[];
   isDraft: boolean;
+  // scopes generate/regenerate to a single option, per T56/P10; omitted -> legacy whole-decision slot
+  option?: string;
+  heading?: string;
 }) {
   const router = useRouter();
   const [errors, setErrors] = useState<string[]>([]);
@@ -55,7 +60,7 @@ export function PremortemPanel({
   function regenerate() {
     setErrors([]);
     startTransition(async () => {
-      const result = await generatePremortem(decisionId);
+      const result = await generatePremortem(decisionId, option);
       if (!result.ok) {
         setErrors(result.errors);
         return;
@@ -72,7 +77,7 @@ export function PremortemPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">Pre-mortem</h2>
+        <h2 className="text-sm font-medium">{heading}</h2>
         {isDraft && (
           <button
             type="button"
