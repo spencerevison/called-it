@@ -12,7 +12,8 @@ const HORIZON_MONTHS = 6; // the final check-in horizon, per DATA_MODEL
 
 export type PremortemResult = { ok: true; id: string } | { ok: false; errors: string[] };
 
-export async function generatePremortem(decisionId: string): Promise<PremortemResult> {
+// option omitted -> legacy whole-decision premortem (option = null), per T55/P10
+export async function generatePremortem(decisionId: string, option?: string): Promise<PremortemResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -37,6 +38,9 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
   if (options.length < 2) {
     return { ok: false, errors: ["At least 2 options are required to generate a pre-mortem."] };
   }
+  if (option !== undefined && !options.includes(option)) {
+    return { ok: false, errors: ["Option must be one of the options considered."] };
+  }
 
   if (!hasAnthropicKey()) {
     return { ok: false, errors: ["ANTHROPIC_API_KEY is not configured."] };
@@ -53,7 +57,8 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     title: decision.title,
     context: decision.context,
     options_considered: options.join(", "),
-    chosen_option: decision.chosen_option ?? "(not yet chosen)",
+    // imagining a specific option's path failing overrides the decision's actual chosen_option
+    chosen_option: option ?? decision.chosen_option ?? "(not yet chosen)",
     rationale: decision.rationale ?? "(none given)",
     stakes: decision.stakes,
     reversibility: decision.reversibility,
@@ -92,13 +97,14 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     return { ok: false, errors: ["Pre-mortems can only be generated while the decision is a draft."] };
   }
 
-  // capture the previous latest premortem *before* inserting the new one, so any
-  // hand-added user risks on it can be carried forward below (regenerate must not
-  // silently orphan them - see loop/QUESTIONS.md T25)
-  const { data: previousPremortem } = await service
-    .from("premortems")
-    .select("id")
-    .eq("decision_id", decisionId)
+  // capture the previous latest premortem for this same option *before* inserting the
+  // new one, so any hand-added user risks on it can be carried forward below (regenerate
+  // must not silently orphan them, and must not cross options - see loop/QUESTIONS.md T25)
+  const previousPremortemQuery = service.from("premortems").select("id").eq("decision_id", decisionId);
+  const { data: previousPremortem } = await (option !== undefined
+    ? previousPremortemQuery.eq("option", option)
+    : previousPremortemQuery.is("option", null)
+  )
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -108,6 +114,7 @@ export async function generatePremortem(decisionId: string): Promise<PremortemRe
     .insert({
       user_id: user.id,
       decision_id: decisionId,
+      option: option ?? null,
       prompt_version: PROMPT_VERSION,
       model: template.model,
       langfuse_trace_id: trace.traceId,
@@ -211,7 +218,7 @@ export async function addUserRisk(premortemId: string, formData: FormData): Prom
   const service = createServiceClient();
   const { data: premortem, error: premortemError } = await service
     .from("premortems")
-    .select("user_id, decision_id")
+    .select("user_id, decision_id, option")
     .eq("id", premortemId)
     .single();
 
@@ -230,11 +237,13 @@ export async function addUserRisk(premortemId: string, formData: FormData): Prom
   }
 
   // a regenerate in another tab can leave this premortemId pointing at an inert
-  // history row - writing there would silently vanish from the rendered panel
-  const { data: latestPremortem } = await service
-    .from("premortems")
-    .select("id")
-    .eq("decision_id", premortem.decision_id)
+  // history row - writing there would silently vanish from the rendered panel.
+  // scoped to the same option so an unrelated option's regenerate can't shadow this one.
+  const latestPremortemQuery = service.from("premortems").select("id").eq("decision_id", premortem.decision_id);
+  const { data: latestPremortem } = await (premortem.option !== null
+    ? latestPremortemQuery.eq("option", premortem.option)
+    : latestPremortemQuery.is("option", null)
+  )
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

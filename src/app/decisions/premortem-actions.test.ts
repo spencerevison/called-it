@@ -14,6 +14,28 @@ const premortemFetchSingle = vi.fn();
 const userRiskInsertSingle = vi.fn();
 const latestPremortemMaybeSingle = vi.fn();
 const userRisksSelect = vi.fn();
+const premortemsEq = vi.fn();
+const premortemsIs = vi.fn();
+
+// premortems select supports chained .eq()/.is() (decision_id + option scoping) before
+// terminating in either .single() (ownership fetch) or .order().limit().maybeSingle()
+// (latest-premortem-for-this-option lookup) - see T56.
+function premortemsSelectChain() {
+  const chain: Record<string, unknown> = {};
+  chain.eq = vi.fn((...args: unknown[]) => {
+    premortemsEq(...args);
+    return chain;
+  });
+  chain.is = vi.fn((...args: unknown[]) => {
+    premortemsIs(...args);
+    return chain;
+  });
+  chain.order = vi.fn(() => chain);
+  chain.limit = vi.fn(() => chain);
+  chain.single = premortemFetchSingle;
+  chain.maybeSingle = latestPremortemMaybeSingle;
+  return chain;
+}
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(() => ({
@@ -26,12 +48,7 @@ vi.mock("@/lib/supabase/service", () => ({
       }
       if (table === "premortems") {
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: premortemFetchSingle,
-              order: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: latestPremortemMaybeSingle })) })),
-            })),
-          })),
+          select: vi.fn(() => premortemsSelectChain()),
           insert: vi.fn(() => ({ select: vi.fn(() => ({ single: premortemInsertSingle })) })),
           delete: vi.fn(() => ({ eq: premortemDeleteEq })),
         };
@@ -99,6 +116,8 @@ describe("generatePremortem", () => {
     generatePremortemRisks.mockReset();
     latestPremortemMaybeSingle.mockReset();
     userRisksSelect.mockReset();
+    premortemsEq.mockReset();
+    premortemsIs.mockReset();
     hasAnthropicKey.mockReturnValue(true);
 
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
@@ -250,6 +269,63 @@ describe("generatePremortem", () => {
     expect(risksInsert).toHaveBeenNthCalledWith(2, [
       { user_id: "u1", premortem_id: "pm2", description: "my own risk", category: "external", severity: "high", source: "user" },
     ]);
+    // no option given -> legacy whole-decision lookup, matched via .is(), not .eq("option", ...)
+    expect(premortemsIs).toHaveBeenCalledWith("option", null);
+  });
+
+  it("rejects an option that isn't one of the decision's options_considered", async () => {
+    decisionFetchSingle.mockResolvedValue({ data: draftDecision(), error: null });
+    const { generatePremortem } = await import("./premortem-actions");
+    const result = await generatePremortem("d1", "not-a-real-option");
+    expect(result).toEqual({ ok: false, errors: ["Option must be one of the options considered."] });
+    expect(generatePremortemRisks).not.toHaveBeenCalled();
+  });
+
+  it("renders the prompt with chosen_option overridden to the given option", async () => {
+    decisionFetchSingle.mockResolvedValue({ data: draftDecision({ chosen_option: "a" }), error: null });
+    generatePremortemRisks.mockResolvedValue({
+      ok: true,
+      risks: [{ description: "r", category: "execution", severity: "medium", likelihood: 0.3 }],
+    });
+    premortemInsertSingle.mockResolvedValue({ data: { id: "pm1" }, error: null });
+
+    const { generatePremortem } = await import("./premortem-actions");
+    const result = await generatePremortem("d1", "b");
+
+    expect(result).toEqual({ ok: true, id: "pm1" });
+    // scoped lookup for the previous premortem uses this option, not the legacy null slot
+    expect(premortemsEq).toHaveBeenCalledWith("option", "b");
+  });
+
+  it("scopes carry-forward and the previous-premortem lookup to the same option only, on regenerate", async () => {
+    decisionFetchSingle.mockResolvedValue({ data: draftDecision(), error: null });
+    generatePremortemRisks.mockResolvedValue({
+      ok: true,
+      risks: [{ description: "r", category: "execution", severity: "medium", likelihood: 0.3 }],
+    });
+    premortemInsertSingle.mockResolvedValue({ data: { id: "pm-a-2" }, error: null });
+    // only option A has a previous premortem to carry forward from
+    latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm-a-1" } });
+    userRisksSelect.mockResolvedValue({
+      data: [{ description: "option a user risk", category: "external", severity: "high", user_id: "u1" }],
+    });
+
+    const { generatePremortem } = await import("./premortem-actions");
+    const result = await generatePremortem("d1", "a");
+
+    expect(result).toEqual({ ok: true, id: "pm-a-2" });
+    expect(premortemsEq).toHaveBeenCalledWith("option", "a");
+    expect(premortemsEq).not.toHaveBeenCalledWith("option", "b");
+    expect(risksInsert).toHaveBeenNthCalledWith(2, [
+      {
+        user_id: "u1",
+        premortem_id: "pm-a-2",
+        description: "option a user risk",
+        category: "external",
+        severity: "high",
+        source: "user",
+      },
+    ]);
   });
 });
 
@@ -268,6 +344,8 @@ describe("addUserRisk", () => {
     risksInsert.mockReset();
     userRiskInsertSingle.mockReset();
     latestPremortemMaybeSingle.mockReset();
+    premortemsEq.mockReset();
+    premortemsIs.mockReset();
 
     getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     // default: the premortem being written to is the latest one for its decision
@@ -305,7 +383,7 @@ describe("addUserRisk", () => {
   });
 
   it("rejects once the parent decision is no longer a draft", async () => {
-    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1" }, error: null });
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1", option: null }, error: null });
     decisionFetchSingle.mockResolvedValue({ data: { status: "active" }, error: null });
     const { addUserRisk } = await import("./premortem-actions");
     const result = await addUserRisk("pm1", riskFormData());
@@ -314,7 +392,7 @@ describe("addUserRisk", () => {
   });
 
   it("rejects an add-risk against a premortem that's been superseded by a regenerate", async () => {
-    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1" }, error: null });
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1", option: null }, error: null });
     decisionFetchSingle.mockResolvedValue({ data: { status: "draft" }, error: null });
     latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm2" } });
 
@@ -325,8 +403,22 @@ describe("addUserRisk", () => {
     expect(risksInsert).not.toHaveBeenCalled();
   });
 
+  it("scopes the superseded-check to the premortem's own option, not just its decision", async () => {
+    // option A's premortem is still the latest for option A even though option B has a newer one
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1", option: "a" }, error: null });
+    decisionFetchSingle.mockResolvedValue({ data: { status: "draft" }, error: null });
+    latestPremortemMaybeSingle.mockResolvedValue({ data: { id: "pm1" } });
+    userRiskInsertSingle.mockResolvedValue({ data: { id: "risk1" }, error: null });
+
+    const { addUserRisk } = await import("./premortem-actions");
+    const result = await addUserRisk("pm1", riskFormData());
+
+    expect(result).toEqual({ ok: true, id: "risk1" });
+    expect(premortemsEq).toHaveBeenCalledWith("option", "a");
+  });
+
   it("persists a user risk on a draft decision", async () => {
-    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1" }, error: null });
+    premortemFetchSingle.mockResolvedValue({ data: { user_id: "u1", decision_id: "d1", option: null }, error: null });
     decisionFetchSingle.mockResolvedValue({ data: { status: "draft" }, error: null });
     userRiskInsertSingle.mockResolvedValue({ data: { id: "risk1" }, error: null });
 
