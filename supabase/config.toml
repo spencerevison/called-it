@@ -233,6 +233,12 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
+# Magic-link email uses TokenHash so the link hits the app's /auth/confirm
+# (verifyOtp) route directly, instead of the default PKCE ?code= flow the
+# confirm route can't complete. In prod, set the same template in the dashboard.
+[auth.email.template.magic_link]
+content_path = "./supabase/templates/magic_link.html"
+
 # Use a production-ready SMTP server
 # [auth.email.smtp]
 # enabled = true
